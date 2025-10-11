@@ -157,3 +157,5 @@ TradingAgents/
 
 # Runtime generated files
 eval_results/
+.bot.pid
+*_analysis_*.txt

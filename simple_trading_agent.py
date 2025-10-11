@@ -1,220 +1,286 @@
+"""SimpleTradingAgent - Integration with TradingAgents Framework.
+
+This module provides a simplified interface to the TradingAgents multi-agent
+trading framework, configured to use GLM-4.6 for analysis and OpenAI for embeddings.
+
+The module handles:
+- TradingAgents configuration and initialization
+- Stock analysis orchestration
+- Result formatting for Telegram display
+- Error handling and logging
+
+Note: This implementation uses a custom memory patch to support separate
+API keys for GLM (analysis) and OpenAI (embeddings).
+"""
+
 import asyncio
 import logging
 import sys
 import os
-from typing import Dict
+from typing import Dict, Optional, Tuple, Any
 from datetime import datetime
+from pathlib import Path
 
-# Add TradingAgents to path
-trading_agents_path = os.path.join(os.path.dirname(__file__), 'TradingAgents')
-if trading_agents_path not in sys.path:
-    sys.path.insert(0, trading_agents_path)
+from constants import (
+    PRICE_TARGET_BUY_MULTIPLIER,
+    PRICE_TARGET_SELL_MULTIPLIER,
+    PRICE_TARGET_HOLD_MULTIPLIER,
+    CONFIDENCE_HIGH,
+    CONFIDENCE_MEDIUM,
+    RISK_HIGH_KEYWORDS,
+    RISK_LOW_KEYWORDS,
+    RISK_LEVEL_HIGH,
+    RISK_LEVEL_MEDIUM,
+    RISK_LEVEL_LOW,
+    RECOMMENDATION_BUY,
+    RECOMMENDATION_SELL,
+    RECOMMENDATION_HOLD,
+    TRADINGAGENTS_MAX_DEBATE_ROUNDS,
+    TRADINGAGENTS_DATA_VENDOR,
+    GLM_MODEL_VERSION,
+    GLM_API_BASE_URL,
+    OPENAI_EMBEDDING_MODEL,
+    OPENAI_API_BASE_URL,
+    DEFAULT_HISTORY_PERIOD,
+)
 
-# Import TradingAgents
+# Add TradingAgents to Python path
+trading_agents_path = Path(__file__).parent / 'TradingAgents'
+if str(trading_agents_path) not in sys.path:
+    sys.path.insert(0, str(trading_agents_path))
+
+# Import TradingAgents with error handling
 try:
     from tradingagents.graph.trading_graph import TradingAgentsGraph
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.agents.utils.memory import FinancialSituationMemory
     from openai import OpenAI
     
-    # Monkey patch to fix Z.AI embeddings issue (Z.AI doesn't support embeddings)
-    original_init = FinancialSituationMemory.__init__
+    # Patch FinancialSituationMemory to use separate API keys
+    # This is necessary because Z.AI doesn't support embeddings
+    _original_memory_init = FinancialSituationMemory.__init__
     
-    def patched_init(self, name, config):
-        """Patched init that uses OpenAI for embeddings, regardless of backend_url"""
+    def _patched_memory_init(self, name: str, config: Dict[str, Any]) -> None:
+        """Patched init that uses OpenAI for embeddings regardless of backend_url.
+        
+        Args:
+            name: Name for the memory collection
+            config: Configuration dictionary with backend_url
+        """
         import chromadb
         from chromadb.config import Settings
         
-        if config["backend_url"] == "http://localhost:11434/v1":
+        if config.get("backend_url") == "http://localhost:11434/v1":
+            # Local Ollama setup
             self.embedding = "nomic-embed-text"
             self.client = OpenAI(base_url=config["backend_url"])
         else:
-            # Always use OpenAI API for embeddings (Z.AI doesn't support embeddings)
-            self.embedding = "text-embedding-3-small"
-            # Use separate OpenAI key for embeddings
-            openai_embeddings_key = os.environ.get('OPENAI_EMBEDDINGS_KEY')
+            # Always use OpenAI for embeddings when using cloud APIs
+            self.embedding = OPENAI_EMBEDDING_MODEL
+            openai_key = os.environ.get('OPENAI_EMBEDDINGS_KEY')
             self.client = OpenAI(
-                api_key=openai_embeddings_key,
-                base_url="https://api.openai.com/v1"
+                api_key=openai_key,
+                base_url=OPENAI_API_BASE_URL
             )
         
         self.chroma_client = chromadb.Client(Settings(allow_reset=True))
         self.situation_collection = self.chroma_client.create_collection(name=name)
     
-    # Apply the monkey patch
-    FinancialSituationMemory.__init__ = patched_init
+    # Apply the patch
+    FinancialSituationMemory.__init__ = _patched_memory_init
     
     TRADING_AGENTS_AVAILABLE = True
 except ImportError as e:
-    print(f"Warning: TradingAgents not available: {e}")
+    logging.warning(f"TradingAgents library not available: {e}")
     TRADING_AGENTS_AVAILABLE = False
 
+
+logger = logging.getLogger(__name__)
+
+
+class TradingAgentError(Exception):
+    """Raised when there's an error in trading agent operations."""
+    pass
+
+
 class SimpleTradingAgent:
-    """Simple trading agent that uses TradingAgents library directly"""
+    """Simplified interface to TradingAgents framework.
     
-    def __init__(self, glm_api_key: str, finnhub_api_key: str, openai_api_key: str = None):
+    This class provides a streamlined way to analyze stocks using the
+    TradingAgents multi-agent framework with GLM-4.6 for analysis.
+    
+    Attributes:
+        glm_api_key: API key for Z.AI (GLM)
+        finnhub_api_key: API key for Finnhub
+        openai_api_key: API key for OpenAI (embeddings only)
+        config: TradingAgents configuration dictionary
+        trading_agents: Instance of TradingAgentsGraph
+    """
+    
+    def __init__(
+        self,
+        glm_api_key: str,
+        finnhub_api_key: str,
+        openai_api_key: Optional[str] = None
+    ) -> None:
+        """Initialize SimpleTradingAgent.
+        
+        Args:
+            glm_api_key: Z.AI API key for GLM-4.6
+            finnhub_api_key: Finnhub API key for market data
+            openai_api_key: OpenAI API key for embeddings (optional, defaults to GLM key)
+        """
         self.glm_api_key = glm_api_key
         self.finnhub_api_key = finnhub_api_key
-        self.openai_api_key = openai_api_key or glm_api_key  # Fallback to GLM if not provided
-        self.logger = logging.getLogger(__name__)
+        self.openai_api_key = openai_api_key or glm_api_key
         
         # Configure TradingAgents to use GLM-4.6
-        self.config = DEFAULT_CONFIG.copy()
-        self.config["llm_provider"] = "openai"  # GLM is OpenAI-compatible
-        self.config["backend_url"] = "https://api.z.ai/api/paas/v4/"
-        self.config["deep_think_llm"] = "glm-4.6"  # Use GLM-4.6 for deep thinking
-        self.config["quick_think_llm"] = "glm-4.6"  # Use GLM-4.6 for quick thinking
-        self.config["max_debate_rounds"] = 1  # Reduce debate rounds for faster response
-        
-        # Configure data vendors to use yfinance
-        self.config["data_vendors"] = {
-            "core_stock_apis": "yfinance",
-            "technical_indicators": "yfinance", 
-            "fundamental_data": "yfinance",
-            "news_data": "yfinance",
-        }
+        self.config = self._create_config()
         
         # Initialize TradingAgents
-        self.trading_agents = None
+        self.trading_agents: Optional[TradingAgentsGraph] = None
         self._initialize_agents()
     
-    def _initialize_agents(self):
-        """Initialize the TradingAgents graph"""
+    def _create_config(self) -> Dict[str, Any]:
+        """Create TradingAgents configuration.
+        
+        Returns:
+            Dictionary with TradingAgents configuration
+        """
+        config = DEFAULT_CONFIG.copy()
+        
+        # Configure LLM provider (GLM is OpenAI-compatible)
+        config["llm_provider"] = "openai"
+        config["backend_url"] = GLM_API_BASE_URL
+        config["deep_think_llm"] = GLM_MODEL_VERSION
+        config["quick_think_llm"] = GLM_MODEL_VERSION
+        config["max_debate_rounds"] = TRADINGAGENTS_MAX_DEBATE_ROUNDS
+        
+        # Configure data vendors to use yfinance
+        config["data_vendors"] = {
+            "core_stock_apis": TRADINGAGENTS_DATA_VENDOR,
+            "technical_indicators": TRADINGAGENTS_DATA_VENDOR,
+            "fundamental_data": TRADINGAGENTS_DATA_VENDOR,
+            "news_data": TRADINGAGENTS_DATA_VENDOR,
+        }
+        
+        return config
+    
+    def _initialize_agents(self) -> None:
+        """Initialize the TradingAgents graph.
+        
+        Raises:
+            TradingAgentError: If initialization fails
+        """
         if not TRADING_AGENTS_AVAILABLE:
-            self.logger.warning("TradingAgents not available")
+            logger.warning("TradingAgents library not available")
             self.trading_agents = None
             return
-            
+        
         try:
-            # Set OPENAI_API_KEY to GLM key because TradingAgents uses this env variable
-            # The monkey patch will use a separate OpenAI client for embeddings
+            # Set environment variables for TradingAgents
+            # Main API key is GLM, separate key for embeddings
             os.environ['OPENAI_API_KEY'] = self.glm_api_key
-            # Store OpenAI key separately for embeddings
             os.environ['OPENAI_EMBEDDINGS_KEY'] = self.openai_api_key
             
             self.trading_agents = TradingAgentsGraph(
-                debug=False, 
+                debug=False,
                 config=self.config
             )
-            self.logger.info("TradingAgents initialized successfully with GLM-4.6 (chat) + OpenAI (embeddings)")
+            
+            logger.info(
+                "TradingAgents initialized successfully "
+                f"(Analysis: GLM-4.6, Embeddings: OpenAI)"
+            )
         except Exception as e:
-            self.logger.error(f"Failed to initialize TradingAgents: {e}")
-            self.trading_agents = None
+            logger.error(f"Failed to initialize TradingAgents: {e}", exc_info=True)
+            raise TradingAgentError(f"Initialization failed: {e}")
     
-    async def analyze_stock(self, symbol: str) -> Dict:
-        """Analyze a stock using TradingAgents library directly"""
+    async def analyze_stock(self, symbol: str) -> Dict[str, Any]:
+        """Analyze a stock using TradingAgents framework.
+        
+        Args:
+            symbol: Stock ticker symbol (e.g., 'AAPL')
+            
+        Returns:
+            Dictionary containing analysis results with keys:
+                - symbol: Stock ticker
+                - timestamp: Analysis timestamp
+                - analysis_type: Type of analysis performed
+                - current_price: Current stock price
+                - price_change: Price change percentage
+                - recommendation: BUY/SELL/HOLD
+                - confidence: Confidence score (0-10)
+                - reasons: Detailed analysis text
+                - price_target: Target price
+                - risk_level: Risk assessment
+                
+        Raises:
+            TradingAgentError: If analysis fails
+        """
         if not self.trading_agents:
-            return {"error": "TradingAgents not properly initialized"}
+            raise TradingAgentError("TradingAgents not properly initialized")
         
         try:
-            # Get current date
             current_date = datetime.now().strftime("%Y-%m-%d")
             
-            self.logger.info(f"Starting TradingAgents analysis for {symbol} on {current_date}")
+            logger.info(f"Starting analysis for {symbol} on {current_date}")
             
-            # Run TradingAgents analysis
+            # Run TradingAgents analysis in thread pool
             result, decision = await asyncio.to_thread(
-                self.trading_agents.propagate, 
-                symbol, 
+                self.trading_agents.propagate,
+                symbol,
                 current_date
             )
             
-            # Log raw result and decision for debugging
-            self.logger.info(f"TradingAgents result type: {type(result)}, decision type: {type(decision)}")
-            self.logger.info(f"TradingAgents result keys: {result.keys() if isinstance(result, dict) else 'not a dict'}")
-            self.logger.info(f"TradingAgents decision: {decision}")
+            logger.info(f"Analysis completed for {symbol}: {decision}")
+            logger.debug(f"Result type: {type(result)}, Decision: {decision}")
             
-            # Format the result for display
-            formatted_result = self._format_trading_agents_result(symbol, result, decision)
-            
-            return formatted_result
+            # Format and return results
+            return self._format_analysis_result(symbol, result, decision)
             
         except Exception as e:
-            self.logger.error(f"Error in TradingAgents analysis for {symbol}: {e}")
-            return {"error": f"TradingAgents analysis failed: {str(e)}"}
+            logger.error(
+                f"Analysis failed for {symbol}: {e}",
+                exc_info=True
+            )
+            raise TradingAgentError(f"Analysis failed: {e}")
     
-    def _format_trading_agents_result(self, symbol: str, result: Dict, decision: str) -> Dict:
-        """Format TradingAgents result for Telegram display"""
+    def _format_analysis_result(
+        self,
+        symbol: str,
+        result: Dict[str, Any],
+        decision: str
+    ) -> Dict[str, Any]:
+        """Format TradingAgents result for Telegram display.
+        
+        Args:
+            symbol: Stock ticker symbol
+            result: Raw result from TradingAgents
+            decision: Trading decision (BUY/SELL/HOLD)
+            
+        Returns:
+            Formatted analysis dictionary
+        """
         try:
-            # Decision is a string like "BUY", "SELL", or "HOLD"
-            recommendation = str(decision).strip().upper() if decision else 'HOLD'
+            # Normalize recommendation
+            recommendation = self._normalize_recommendation(decision)
             
-            # Extract comprehensive analysis from final_state (result)
-            analysis_text = ""
+            # Extract comprehensive analysis
+            analysis_text = self._extract_analysis_text(result)
             
-            if isinstance(result, dict):
-                # Get the full trade decision text
-                final_decision = result.get('final_trade_decision', '')
-                investment_plan = result.get('investment_plan', '')
-                trader_plan = result.get('trader_investment_plan', '')
-                
-                # Combine all analysis sections
-                analysis_sections = []
-                
-                if result.get('market_report'):
-                    analysis_sections.append(f"Market Analysis: {result['market_report']}")
-                
-                if result.get('fundamentals_report'):
-                    analysis_sections.append(f"Fundamental Analysis: {result['fundamentals_report']}")
-                
-                if result.get('news_report'):
-                    analysis_sections.append(f"News Analysis: {result['news_report']}")
-                
-                if result.get('sentiment_report'):
-                    analysis_sections.append(f"Sentiment Analysis: {result['sentiment_report']}")
-                
-                # Add investment debate conclusions
-                if result.get('investment_debate_state', {}).get('judge_decision'):
-                    analysis_sections.append(f"Investment Debate: {result['investment_debate_state']['judge_decision']}")
-                
-                # Add trader's plan
-                if trader_plan:
-                    analysis_sections.append(f"Trading Plan: {trader_plan}")
-                
-                # Add final investment plan
-                if investment_plan:
-                    analysis_sections.append(f"Investment Plan: {investment_plan}")
-                
-                # Add final decision
-                if final_decision:
-                    analysis_sections.append(f"Final Decision: {final_decision}")
-                
-                analysis_text = "\n\n".join(analysis_sections)
+            # Get current price data
+            current_price, price_change = self._fetch_price_data(symbol)
             
-            # Get stock price from yfinance (TradingAgents doesn't return it in final state)
-            import yfinance as yf
-            current_price = 0
-            price_change = 0
-            try:
-                ticker = yf.Ticker(symbol)
-                hist = ticker.history(period="2d")
-                if not hist.empty:
-                    current_price = float(hist['Close'].iloc[-1])
-                    if len(hist) > 1:
-                        price_change = float((hist['Close'].iloc[-1] / hist['Close'].iloc[-2] - 1) * 100)
-            except Exception as e:
-                self.logger.error(f"Error fetching price for {symbol}: {e}")
+            # Calculate price target
+            price_target = self._calculate_price_target(
+                current_price,
+                recommendation
+            )
             
-            # Calculate price target based on recommendation
-            price_target = 0
-            if current_price > 0:
-                if recommendation == 'BUY':
-                    price_target = current_price * 1.1  # 10% above
-                elif recommendation == 'SELL':
-                    price_target = current_price * 0.9  # 10% below
-                else:
-                    price_target = current_price * 1.05  # 5% above
-            
-            # Determine confidence and risk based on analysis depth
-            confidence = 8 if analysis_text else 5  # Higher confidence if we have full analysis
-            risk_level = "MEDIUM"  # Default, could be extracted from risk debate if available
-            
-            if isinstance(result, dict) and result.get('risk_debate_state', {}).get('judge_decision'):
-                risk_decision = result['risk_debate_state']['judge_decision']
-                if 'high' in risk_decision.lower() or 'aggressive' in risk_decision.lower():
-                    risk_level = "HIGH"
-                elif 'low' in risk_decision.lower() or 'conservative' in risk_decision.lower():
-                    risk_level = "LOW"
+            # Determine confidence and risk
+            confidence = CONFIDENCE_HIGH if analysis_text else CONFIDENCE_MEDIUM
+            risk_level = self._determine_risk_level(result)
             
             return {
                 "symbol": symbol,
@@ -224,18 +290,172 @@ class SimpleTradingAgent:
                 "price_change": price_change,
                 "recommendation": recommendation,
                 "confidence": confidence,
-                "reasons": analysis_text if analysis_text else "Full TradingAgents analysis completed",
+                "reasons": analysis_text or "Analysis completed successfully",
                 "price_target": price_target,
                 "risk_level": risk_level
             }
             
         except Exception as e:
-            self.logger.error(f"Error formatting TradingAgents result: {e}")
-            import traceback
-            self.logger.error(traceback.format_exc())
+            logger.error(f"Error formatting result: {e}", exc_info=True)
             return {
                 "symbol": symbol,
-                "error": f"Error formatting result: {str(e)}",
+                "error": f"Formatting error: {str(e)}",
                 "timestamp": datetime.now().isoformat(),
                 "analysis_type": "TRADING_AGENTS"
             }
+    
+    @staticmethod
+    def _normalize_recommendation(decision: Optional[str]) -> str:
+        """Normalize trading decision to standard format.
+        
+        Args:
+            decision: Raw decision string from TradingAgents
+            
+        Returns:
+            Normalized recommendation (BUY/SELL/HOLD)
+        """
+        if not decision:
+            return RECOMMENDATION_HOLD
+        
+        decision_upper = str(decision).strip().upper()
+        
+        if decision_upper in (RECOMMENDATION_BUY, RECOMMENDATION_SELL, RECOMMENDATION_HOLD):
+            return decision_upper
+        
+        return RECOMMENDATION_HOLD
+    
+    @staticmethod
+    def _extract_analysis_text(result: Dict[str, Any]) -> str:
+        """Extract comprehensive analysis text from result.
+        
+        Args:
+            result: Raw result dictionary from TradingAgents
+            
+        Returns:
+            Formatted analysis text
+        """
+        if not isinstance(result, dict):
+            return ""
+        
+        sections = []
+        
+        # Extract key reports
+        report_keys = [
+            ('market_report', 'Market Analysis'),
+            ('fundamentals_report', 'Fundamental Analysis'),
+            ('news_report', 'News Analysis'),
+            ('sentiment_report', 'Sentiment Analysis'),
+        ]
+        
+        for key, title in report_keys:
+            if result.get(key):
+                sections.append(f"{title}: {result[key]}")
+        
+        # Add investment debate conclusions
+        debate_decision = result.get('investment_debate_state', {}).get('judge_decision')
+        if debate_decision:
+            sections.append(f"Investment Debate: {debate_decision}")
+        
+        # Add trader's plan
+        trader_plan = result.get('trader_investment_plan')
+        if trader_plan:
+            sections.append(f"Trading Plan: {trader_plan}")
+        
+        # Add investment plan
+        investment_plan = result.get('investment_plan')
+        if investment_plan:
+            sections.append(f"Investment Plan: {investment_plan}")
+        
+        # Add final decision
+        final_decision = result.get('final_trade_decision')
+        if final_decision:
+            sections.append(f"Final Decision: {final_decision}")
+        
+        return "\\n\\n".join(sections)
+    
+    @staticmethod
+    def _fetch_price_data(symbol: str) -> Tuple[float, float]:
+        """Fetch current price and price change for a symbol.
+        
+        Args:
+            symbol: Stock ticker symbol
+            
+        Returns:
+            Tuple of (current_price, price_change_percent)
+        """
+        try:
+            import yfinance as yf
+            
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period=DEFAULT_HISTORY_PERIOD)
+            
+            if hist.empty:
+                logger.warning(f"No price data available for {symbol}")
+                return 0.0, 0.0
+            
+            current_price = float(hist['Close'].iloc[-1])
+            
+            if len(hist) > 1:
+                prev_price = float(hist['Close'].iloc[-2])
+                price_change = ((current_price / prev_price) - 1) * 100
+            else:
+                price_change = 0.0
+            
+            return current_price, price_change
+            
+        except Exception as e:
+            logger.error(f"Error fetching price for {symbol}: {e}")
+            return 0.0, 0.0
+    
+    @staticmethod
+    def _calculate_price_target(
+        current_price: float,
+        recommendation: str
+    ) -> float:
+        """Calculate price target based on recommendation.
+        
+        Args:
+            current_price: Current stock price
+            recommendation: Trading recommendation
+            
+        Returns:
+            Target price
+        """
+        if current_price <= 0:
+            return 0.0
+        
+        multipliers = {
+            RECOMMENDATION_BUY: PRICE_TARGET_BUY_MULTIPLIER,
+            RECOMMENDATION_SELL: PRICE_TARGET_SELL_MULTIPLIER,
+            RECOMMENDATION_HOLD: PRICE_TARGET_HOLD_MULTIPLIER,
+        }
+        
+        multiplier = multipliers.get(recommendation, PRICE_TARGET_HOLD_MULTIPLIER)
+        return current_price * multiplier
+    
+    @staticmethod
+    def _determine_risk_level(result: Dict[str, Any]) -> str:
+        """Determine risk level from analysis result.
+        
+        Args:
+            result: Result dictionary from TradingAgents
+            
+        Returns:
+            Risk level string (HIGH/MEDIUM/LOW)
+        """
+        if not isinstance(result, dict):
+            return RISK_LEVEL_MEDIUM
+        
+        risk_decision = result.get('risk_debate_state', {}).get('judge_decision', '')
+        
+        if not risk_decision:
+            return RISK_LEVEL_MEDIUM
+        
+        risk_lower = risk_decision.lower()
+        
+        if any(keyword in risk_lower for keyword in RISK_HIGH_KEYWORDS):
+            return RISK_LEVEL_HIGH
+        elif any(keyword in risk_lower for keyword in RISK_LOW_KEYWORDS):
+            return RISK_LEVEL_LOW
+        
+        return RISK_LEVEL_MEDIUM
