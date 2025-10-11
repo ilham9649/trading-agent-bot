@@ -83,6 +83,11 @@ class SimpleTradingAgent:
                 current_date
             )
             
+            # Log raw result and decision for debugging
+            self.logger.info(f"TradingAgents result type: {type(result)}, decision type: {type(decision)}")
+            self.logger.info(f"TradingAgents result keys: {result.keys() if isinstance(result, dict) else 'not a dict'}")
+            self.logger.info(f"TradingAgents decision: {decision}")
+            
             # Format the result for display
             formatted_result = self._format_trading_agents_result(symbol, result, decision)
             
@@ -92,90 +97,109 @@ class SimpleTradingAgent:
             self.logger.error(f"Error in TradingAgents analysis for {symbol}: {e}")
             return {"error": f"TradingAgents analysis failed: {str(e)}"}
     
-    def _format_trading_agents_result(self, symbol: str, result: Dict, decision: Dict) -> Dict:
+    def _format_trading_agents_result(self, symbol: str, result: Dict, decision: str) -> Dict:
         """Format TradingAgents result for Telegram display"""
         try:
-            # Extract basic information
-            analysis_data = {
+            # Decision is a string like "BUY", "SELL", or "HOLD"
+            recommendation = str(decision).strip().upper() if decision else 'HOLD'
+            
+            # Extract comprehensive analysis from final_state (result)
+            analysis_text = ""
+            
+            if isinstance(result, dict):
+                # Get the full trade decision text
+                final_decision = result.get('final_trade_decision', '')
+                investment_plan = result.get('investment_plan', '')
+                trader_plan = result.get('trader_investment_plan', '')
+                
+                # Combine all analysis sections
+                analysis_sections = []
+                
+                if result.get('market_report'):
+                    analysis_sections.append(f"Market Analysis: {result['market_report']}")
+                
+                if result.get('fundamentals_report'):
+                    analysis_sections.append(f"Fundamental Analysis: {result['fundamentals_report']}")
+                
+                if result.get('news_report'):
+                    analysis_sections.append(f"News Analysis: {result['news_report']}")
+                
+                if result.get('sentiment_report'):
+                    analysis_sections.append(f"Sentiment Analysis: {result['sentiment_report']}")
+                
+                # Add investment debate conclusions
+                if result.get('investment_debate_state', {}).get('judge_decision'):
+                    analysis_sections.append(f"Investment Debate: {result['investment_debate_state']['judge_decision']}")
+                
+                # Add trader's plan
+                if trader_plan:
+                    analysis_sections.append(f"Trading Plan: {trader_plan}")
+                
+                # Add final investment plan
+                if investment_plan:
+                    analysis_sections.append(f"Investment Plan: {investment_plan}")
+                
+                # Add final decision
+                if final_decision:
+                    analysis_sections.append(f"Final Decision: {final_decision}")
+                
+                analysis_text = "\n\n".join(analysis_sections)
+            
+            # Get stock price from yfinance (TradingAgents doesn't return it in final state)
+            import yfinance as yf
+            current_price = 0
+            price_change = 0
+            try:
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(period="2d")
+                if not hist.empty:
+                    current_price = float(hist['Close'].iloc[-1])
+                    if len(hist) > 1:
+                        price_change = float((hist['Close'].iloc[-1] / hist['Close'].iloc[-2] - 1) * 100)
+            except Exception as e:
+                self.logger.error(f"Error fetching price for {symbol}: {e}")
+            
+            # Calculate price target based on recommendation
+            price_target = 0
+            if current_price > 0:
+                if recommendation == 'BUY':
+                    price_target = current_price * 1.1  # 10% above
+                elif recommendation == 'SELL':
+                    price_target = current_price * 0.9  # 10% below
+                else:
+                    price_target = current_price * 1.05  # 5% above
+            
+            # Determine confidence and risk based on analysis depth
+            confidence = 8 if analysis_text else 5  # Higher confidence if we have full analysis
+            risk_level = "MEDIUM"  # Default, could be extracted from risk debate if available
+            
+            if isinstance(result, dict) and result.get('risk_debate_state', {}).get('judge_decision'):
+                risk_decision = result['risk_debate_state']['judge_decision']
+                if 'high' in risk_decision.lower() or 'aggressive' in risk_decision.lower():
+                    risk_level = "HIGH"
+                elif 'low' in risk_decision.lower() or 'conservative' in risk_decision.lower():
+                    risk_level = "LOW"
+            
+            return {
                 "symbol": symbol,
                 "timestamp": datetime.now().isoformat(),
                 "analysis_type": "TRADING_AGENTS",
-                "raw_result": result,
-                "raw_decision": decision
-            }
-            
-            # Try to extract recommendation from decision
-            if isinstance(decision, dict):
-                recommendation = decision.get('recommendation', decision.get('action', decision.get('decision', 'HOLD')))
-                confidence = decision.get('confidence', decision.get('confidence_level', 5))
-                reasons = decision.get('reasons', decision.get('analysis', decision.get('reasoning', 'Analysis completed by TradingAgents')))
-                price_target = decision.get('price_target', decision.get('target_price', 0))
-                risk_level = decision.get('risk_level', decision.get('risk', 'MEDIUM'))
-            else:
-                # If decision is not a dict, use defaults
-                recommendation = 'HOLD'
-                confidence = 5
-                reasons = str(decision) if decision else 'Analysis completed by TradingAgents'
-                price_target = 0
-                risk_level = 'MEDIUM'
-            
-            # Try to extract price information from result
-            current_price = 0
-            price_change = 0
-            
-            if isinstance(result, dict):
-                # Look for price data in various possible locations
-                price_data = result.get('price_data', {})
-                if not price_data:
-                    price_data = result.get('stock_data', {})
-                if not price_data:
-                    price_data = result.get('data', {})
-                
-                current_price = price_data.get('current_price', price_data.get('price', 0))
-                price_change = price_data.get('price_change', price_data.get('change', 0))
-                
-                # If still no price data, try to get it from other fields
-                if not current_price:
-                    current_price = result.get('current_price', result.get('price', 0))
-                if not price_change:
-                    price_change = result.get('price_change', result.get('change', 0))
-            
-            # Ensure numeric values
-            try:
-                current_price = float(current_price) if current_price else 0
-                price_change = float(price_change) if price_change else 0
-                price_target = float(price_target) if price_target else 0
-            except (ValueError, TypeError):
-                current_price = 0
-                price_change = 0
-                price_target = 0
-            
-            # If no price target provided, calculate a reasonable one
-            if price_target == 0 and current_price > 0:
-                if recommendation.upper() == 'BUY':
-                    price_target = current_price * 1.1  # 10% above current price
-                elif recommendation.upper() == 'SELL':
-                    price_target = current_price * 0.9  # 10% below current price
-                else:
-                    price_target = current_price * 1.05  # 5% above current price
-            
-            analysis_data.update({
                 "current_price": current_price,
                 "price_change": price_change,
                 "recommendation": recommendation,
                 "confidence": confidence,
-                "reasons": reasons,
+                "reasons": analysis_text if analysis_text else "Full TradingAgents analysis completed",
                 "price_target": price_target,
                 "risk_level": risk_level
-            })
-            
-            return analysis_data
+            }
             
         except Exception as e:
             self.logger.error(f"Error formatting TradingAgents result: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             return {
                 "symbol": symbol,
                 "error": f"Error formatting result: {str(e)}",
-                "raw_result": str(result),
-                "raw_decision": str(decision)
+                "timestamp": datetime.now().isoformat(),
+                "analysis_type": "TRADING_AGENTS"
             }

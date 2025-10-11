@@ -114,10 +114,25 @@ Let's start trading! 📈
         current_price = analysis.get('current_price', 0)
         price_change = analysis.get('price_change', 0)
         
-        # Convert reasons to string and truncate if too long
+        # Convert reasons to string and truncate smartly if needed
         reasons_text = str(reasons) if reasons else 'No analysis available'
-        if len(reasons_text) > 2000:  # Limit length for Telegram
-            reasons_text = reasons_text[:2000] + "..."
+        
+        # Telegram limit is 4096 chars, but we need space for the message template
+        # Template overhead is ~600 chars, so we can use ~3400 chars for analysis
+        max_analysis_length = 3400
+        
+        if len(reasons_text) > max_analysis_length:
+            # Truncate at the last complete sentence before the limit
+            truncated = reasons_text[:max_analysis_length]
+            last_period = truncated.rfind('.')
+            last_newline = truncated.rfind('\n')
+            
+            # Cut at the last sentence or paragraph boundary
+            cut_point = max(last_period, last_newline)
+            if cut_point > max_analysis_length - 500:  # If cut point is reasonably close
+                reasons_text = reasons_text[:cut_point + 1] + "\n\n[Analysis truncated due to length limit]"
+            else:
+                reasons_text = truncated + "...\n\n[Analysis truncated due to length limit]"
         
         # Determine emoji based on recommendation
         rec_emoji = {
