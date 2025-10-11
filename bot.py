@@ -17,7 +17,11 @@ class TradingBot:
     """Main Telegram bot class for financial recommendations"""
     
     def __init__(self):
-        self.simple_trading_agent = SimpleTradingAgent(Config.OPENAI_API_KEY, Config.FINNHUB_API_KEY)
+        self.simple_trading_agent = SimpleTradingAgent(
+            Config.GLM_API_KEY, 
+            Config.FINNHUB_API_KEY,
+            Config.OPENAI_API_KEY  # For embeddings only
+        )
         self.user_sessions = {}  # Store user preferences and state
     
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

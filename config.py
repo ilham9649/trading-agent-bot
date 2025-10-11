@@ -12,6 +12,7 @@ class Config:
     
     # API Keys
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    GLM_API_KEY = os.getenv('GLM_API_KEY')
     FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY')
     
     # Bot Settings
@@ -28,7 +29,7 @@ class Config:
         """Validate that all required configuration is present"""
         required_vars = [
             'TELEGRAM_BOT_TOKEN',
-            'OPENAI_API_KEY', 
+            'GLM_API_KEY', 
             'FINNHUB_API_KEY'
         ]
         
