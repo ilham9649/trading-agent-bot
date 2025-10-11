@@ -151,3 +151,9 @@ logs/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# External libraries (should be cloned during setup)
+TradingAgents/
+
+# Runtime generated files
+eval_results/
