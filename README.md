@@ -14,9 +14,7 @@ A sophisticated Telegram bot that provides financial recommendations using AI an
 ## Commands
 
 - `/start` - Welcome message and bot introduction
-- `/analyze <symbol>` - Get detailed stock analysis (e.g., `/analyze AAPL`)
-- `/market` - Get current market overview
-- `/news <symbol>` - Get recent company news (e.g., `/news TSLA`)
+- `/analyze <symbol>` - Get comprehensive stock analysis (e.g., `/analyze AAPL`)
 - `/help` - Show all available commands
 
 ## Prerequisites
