@@ -35,6 +35,7 @@ class Config:
         OPENAI_API_KEY: OpenAI API key for embeddings
         GLM_API_KEY: Z.AI (GLM) API key for analysis
         FINNHUB_API_KEY: Finnhub API key for market data
+        ALPHA_VANTAGE_API_KEY: Alpha Vantage API key for news data
         BOT_DEBUG: Enable debug mode
         LOG_LEVEL: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         DEFAULT_TIMEFRAME: Default timeframe for stock data
@@ -48,6 +49,7 @@ class Config:
     OPENAI_API_KEY: Optional[str] = os.getenv('OPENAI_API_KEY')
     GLM_API_KEY: Optional[str] = os.getenv('GLM_API_KEY')
     FINNHUB_API_KEY: Optional[str] = os.getenv('FINNHUB_API_KEY')
+    ALPHA_VANTAGE_API_KEY: Optional[str] = os.getenv('ALPHA_VANTAGE_API_KEY')
     
     # Bot Settings
     BOT_DEBUG: bool = os.getenv('BOT_DEBUG', 'False').lower() in ('true', '1', 'yes')
@@ -129,6 +131,7 @@ Configuration Summary:
   OpenAI API Key: {mask_key(cls.OPENAI_API_KEY)}
   GLM API Key: {mask_key(cls.GLM_API_KEY)}
   Finnhub API Key: {mask_key(cls.FINNHUB_API_KEY)}
+  Alpha Vantage API Key: {mask_key(cls.ALPHA_VANTAGE_API_KEY)}
   Debug Mode: {cls.BOT_DEBUG}
   Log Level: {cls.LOG_LEVEL}
   Default Timeframe: {cls.DEFAULT_TIMEFRAME}

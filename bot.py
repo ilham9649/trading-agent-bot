@@ -61,7 +61,8 @@ class TradingBot:
         self.simple_trading_agent = SimpleTradingAgent(
             Config.GLM_API_KEY,
             Config.FINNHUB_API_KEY,
-            Config.OPENAI_API_KEY
+            Config.OPENAI_API_KEY,
+            Config.ALPHA_VANTAGE_API_KEY
         )
         self.user_sessions = {}  # Store user preferences and state
         logger.info("TradingBot initialized successfully")

@@ -25,6 +25,7 @@ A sophisticated Telegram bot that provides financial recommendations using AI an
 - **Z.AI (GLM) API Key** - Get from [Z.AI Platform](https://api.z.ai/)
 - OpenAI API Key (for embeddings only)
 - Finnhub API Key
+- **Alpha Vantage API Key** - Get from [Alpha Vantage](https://www.alphavantage.co/support/#api-key) (Free tier: 25 calls/day)
 
 ## Quick Start
 
@@ -54,6 +55,7 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 GLM_API_KEY=your_z_ai_api_key_here
 OPENAI_API_KEY=your_openai_api_key_here  # For embeddings only
 FINNHUB_API_KEY=your_finnhub_api_key_here
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here  # For news data
 ```
 
 ### 3. Install Dependencies
@@ -97,6 +99,14 @@ python bot.py
 2. Sign up for a free account
 3. Go to API Keys section
 4. Copy your API key
+
+### 5. Alpha Vantage API Key
+1. Go to [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
+2. Click "Get your free API key today"
+3. Fill out the simple form
+4. Copy your API key
+   - **Free tier**: 25 API calls per day
+   - **Note**: Used for news data and financial information in stock analysis
 
 ## Configuration
 

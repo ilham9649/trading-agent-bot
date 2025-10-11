@@ -113,6 +113,7 @@ class SimpleTradingAgent:
         glm_api_key: API key for Z.AI (GLM)
         finnhub_api_key: API key for Finnhub
         openai_api_key: API key for OpenAI (embeddings only)
+        alpha_vantage_api_key: API key for Alpha Vantage (news data)
         config: TradingAgents configuration dictionary
         trading_agents: Instance of TradingAgentsGraph
     """
@@ -121,7 +122,8 @@ class SimpleTradingAgent:
         self,
         glm_api_key: str,
         finnhub_api_key: str,
-        openai_api_key: Optional[str] = None
+        openai_api_key: Optional[str] = None,
+        alpha_vantage_api_key: Optional[str] = None
     ) -> None:
         """Initialize SimpleTradingAgent.
         
@@ -129,10 +131,12 @@ class SimpleTradingAgent:
             glm_api_key: Z.AI API key for GLM-4.6
             finnhub_api_key: Finnhub API key for market data
             openai_api_key: OpenAI API key for embeddings (optional, defaults to GLM key)
+            alpha_vantage_api_key: Alpha Vantage API key for news data (optional)
         """
         self.glm_api_key = glm_api_key
         self.finnhub_api_key = finnhub_api_key
         self.openai_api_key = openai_api_key or glm_api_key
+        self.alpha_vantage_api_key = alpha_vantage_api_key
         
         # Configure TradingAgents to use GLM-4.6
         self.config = self._create_config()
@@ -156,12 +160,13 @@ class SimpleTradingAgent:
         config["quick_think_llm"] = GLM_MODEL_VERSION
         config["max_debate_rounds"] = TRADINGAGENTS_MAX_DEBATE_ROUNDS
         
-        # Configure data vendors to use yfinance
+        # Configure data vendors
+        # Use yfinance for stock data, Alpha Vantage for news
         config["data_vendors"] = {
             "core_stock_apis": TRADINGAGENTS_DATA_VENDOR,
             "technical_indicators": TRADINGAGENTS_DATA_VENDOR,
             "fundamental_data": TRADINGAGENTS_DATA_VENDOR,
-            "news_data": TRADINGAGENTS_DATA_VENDOR,
+            "news_data": "alpha_vantage",  # Alpha Vantage for news data
         }
         
         return config
@@ -182,6 +187,16 @@ class SimpleTradingAgent:
             # Main API key is GLM, separate key for embeddings
             os.environ['OPENAI_API_KEY'] = self.glm_api_key
             os.environ['OPENAI_EMBEDDINGS_KEY'] = self.openai_api_key
+            
+            # Set Alpha Vantage API key if provided
+            if self.alpha_vantage_api_key:
+                os.environ['ALPHA_VANTAGE_API_KEY'] = self.alpha_vantage_api_key
+                logger.info("Alpha Vantage API key configured for news data")
+            else:
+                logger.warning(
+                    "Alpha Vantage API key not provided - news data may be limited. "
+                    "Get a free key at https://www.alphavantage.co/support/#api-key"
+                )
             
             self.trading_agents = TradingAgentsGraph(
                 debug=False,
