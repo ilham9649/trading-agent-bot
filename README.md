@@ -1,15 +1,15 @@
 # Trading Agent Telegram Bot
 
-A sophisticated Telegram bot that provides financial recommendations using AI and real-time market data. The bot uses **GLM-4.6 (Z.AI)** for analysis through the **TradingAgents** multi-agent framework.
+A sophisticated Telegram bot that provides financial recommendations using AI and real-time market data. The bot uses **GLM-4-32b-0414-128k (Z.AI)** for analysis through the **TradingAgents** multi-agent framework.
 
 ## Features
 
-- 🤖 **AI-Powered Analysis**: Uses GLM-4.6 (Z.AI) via TradingAgents multi-agent framework for intelligent stock recommendations
+- 🤖 **AI-Powered Analysis**: Uses GLM-4-32b-0414-128k (Z.AI) via TradingAgents multi-agent framework for intelligent stock recommendations
 - 📊 **Real-time Data**: Fetches live market data from Yahoo Finance
 - 📈 **Multi-Agent System**: Leverages TradingAgents framework for comprehensive analysis
 - 🎯 **Comprehensive Reports**: Provides both quick summary and detailed analysis file
 - 📄 **Full Analysis Export**: Sends complete untruncated analysis as .txt file
-- 🔍 **Deep Thinking**: Uses GLM-4.6 for both deep and quick thinking modes
+- 🔍 **Deep Thinking**: Uses GLM-4-32b-0414-128k for both deep and quick thinking modes
 
 ## Commands
 
@@ -146,7 +146,7 @@ Returns:
 ```
 trading-agent-bot/
 ├── bot.py                      # Main Telegram bot
-├── simple_trading_agent.py     # TradingAgents integration + GLM-4.6
+├── trading_agent.py            # TradingAgents integration + GLM-4-32b-0414-128k
 ├── config.py                   # Configuration management
 ├── requirements.txt            # Python dependencies
 ├── manage_bot.sh              # Bot management script
@@ -161,7 +161,7 @@ trading-agent-bot/
 1. **User sends `/analyze AAPL`**
 2. **Bot fetches data** from Yahoo Finance
 3. **TradingAgents framework** processes with multiple AI agents:
-   - Uses **GLM-4.6** (Z.AI) for analysis
+   - Uses **GLM-4-32b-0414-128k** (Z.AI) for analysis
    - Multi-agent debate and consensus
    - Comprehensive reasoning
 4. **Bot returns**:
@@ -171,7 +171,7 @@ trading-agent-bot/
 ## Technical Details
 
 ### AI Models
-- **Chat/Analysis**: GLM-4.6 via Z.AI API
+- **Chat/Analysis**: GLM-4-32b-0414-128k via Z.AI API
 - **Embeddings**: OpenAI text-embedding-3-small
 - **Framework**: TradingAgents multi-agent system
 
@@ -224,7 +224,7 @@ tail -f bot.log
 
 This project uses:
 - [TradingAgents](https://github.com/TauricResearch/TradingAgents) - Multi-agent trading framework
-- [Z.AI](https://api.z.ai/) - GLM-4.6 language model
+- [Z.AI](https://api.z.ai/) - GLM-4-32b-0414-128k language model
 - [OpenAI](https://platform.openai.com/) - Embeddings
 - [yfinance](https://github.com/ranaroussi/yfinance) - Market data
 

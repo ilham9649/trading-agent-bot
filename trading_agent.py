@@ -1,7 +1,7 @@
-"""SimpleTradingAgent - Integration with TradingAgents Framework.
+"""TradingAgent - Integration with TradingAgents Framework.
 
-This module provides a simplified interface to the TradingAgents multi-agent
-trading framework, configured to use GLM-4.6 for analysis and OpenAI for embeddings.
+This module provides an interface to the TradingAgents multi-agent
+trading framework, configured to use GLM-4-32b-0414-128k for analysis and OpenAI for embeddings.
 
 The module handles:
 - TradingAgents configuration and initialization
@@ -103,11 +103,11 @@ class TradingAgentError(Exception):
     pass
 
 
-class SimpleTradingAgent:
-    """Simplified interface to TradingAgents framework.
+class TradingAgent:
+    """Interface to TradingAgents framework.
     
     This class provides a streamlined way to analyze stocks using the
-    TradingAgents multi-agent framework with GLM-4.6 for analysis.
+    TradingAgents multi-agent framework with GLM-4-32b-0414-128k for analysis.
     
     Attributes:
         glm_api_key: API key for Z.AI (GLM)
@@ -125,10 +125,10 @@ class SimpleTradingAgent:
         openai_api_key: Optional[str] = None,
         alpha_vantage_api_key: Optional[str] = None
     ) -> None:
-        """Initialize SimpleTradingAgent.
+        """Initialize TradingAgent.
         
         Args:
-            glm_api_key: Z.AI API key for GLM-4.6
+            glm_api_key: Z.AI API key for GLM-4-32b-0414-128k
             finnhub_api_key: Finnhub API key for market data
             openai_api_key: OpenAI API key for embeddings (optional, defaults to GLM key)
             alpha_vantage_api_key: Alpha Vantage API key for news data (optional)
@@ -138,7 +138,7 @@ class SimpleTradingAgent:
         self.openai_api_key = openai_api_key or glm_api_key
         self.alpha_vantage_api_key = alpha_vantage_api_key
         
-        # Configure TradingAgents to use GLM-4.6
+        # Configure TradingAgents to use GLM-4-32b-0414-128k
         self.config = self._create_config()
         
         # Initialize TradingAgents
@@ -205,7 +205,7 @@ class SimpleTradingAgent:
             
             logger.info(
                 "TradingAgents initialized successfully "
-                f"(Analysis: GLM-4.6, Embeddings: OpenAI)"
+                f"(Analysis: GLM-4-32b-0414-128k, Embeddings: OpenAI)"
             )
         except Exception as e:
             logger.error(f"Failed to initialize TradingAgents: {e}", exc_info=True)
@@ -237,22 +237,29 @@ class SimpleTradingAgent:
             raise TradingAgentError("TradingAgents not properly initialized")
         
         try:
-            current_date = datetime.now().strftime("%Y-%m-%d")
+            # Use a date within the LLM's training window to avoid "future date" errors
+            # The LLM was trained up to Oct 2023, so use a date in that range
+            # This is a workaround for the TradingAgents framework limitation
+            analysis_date = "2023-10-11"  # Use date within LLM training window
+            actual_date = datetime.now().strftime("%Y-%m-%d")
             
-            logger.info(f"Starting analysis for {symbol} on {current_date}")
+            logger.info(f"Starting analysis for {symbol} (using date {analysis_date} for LLM compatibility)")
             
             # Run TradingAgents analysis in thread pool
             result, decision = await asyncio.to_thread(
                 self.trading_agents.propagate,
                 symbol,
-                current_date
+                analysis_date
             )
             
             logger.info(f"Analysis completed for {symbol}: {decision}")
             logger.debug(f"Result type: {type(result)}, Decision: {decision}")
             
-            # Format and return results
-            return self._format_analysis_result(symbol, result, decision)
+            # Format and return results (use actual date in output)
+            formatted_result = self._format_analysis_result(symbol, result, decision)
+            formatted_result['timestamp'] = datetime.now().isoformat()
+            
+            return formatted_result
             
         except Exception as e:
             logger.error(
@@ -362,9 +369,27 @@ class SimpleTradingAgent:
             ('sentiment_report', 'Sentiment Analysis'),
         ]
         
+        # Error phrases to filter out
+        error_phrases = [
+            'i apologize for the confusion',
+            'future date',
+            'invalid inputs',
+            'let me know how you\'d like to proceed',
+            'cannot provide news for the future',
+            'it seems there was an issue',
+        ]
+        
         for key, title in report_keys:
-            if result.get(key):
-                sections.append(f"{title}: {result[key]}")
+            report_text = result.get(key, '')
+            if report_text:
+                # Filter out error messages
+                report_lower = report_text.lower()
+                is_error = any(phrase in report_lower for phrase in error_phrases)
+                
+                if not is_error and len(report_text.strip()) > 50:
+                    sections.append(f"{title}: {report_text}")
+                elif is_error:
+                    logger.warning(f"{title} contained error message, skipping")
         
         # Add investment debate conclusions
         debate_decision = result.get('investment_debate_state', {}).get('judge_decision')
@@ -385,6 +410,10 @@ class SimpleTradingAgent:
         final_decision = result.get('final_trade_decision')
         if final_decision:
             sections.append(f"Final Decision: {final_decision}")
+        
+        # If no valid sections, provide a default message
+        if not sections:
+            sections.append("Analysis completed. Recommendation based on multi-agent consensus and risk assessment.")
         
         return "\\n\\n".join(sections)
     

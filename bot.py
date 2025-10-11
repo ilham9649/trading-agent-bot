@@ -4,7 +4,7 @@ A sophisticated Telegram bot that provides financial recommendations using
 AI-powered multi-agent analysis through the TradingAgents framework.
 
 Features:
-- Real-time stock analysis using GLM-4.6
+- Real-time stock analysis using GLM-4-32b-0414-128k
 - Multi-agent consensus system
 - Comprehensive market insights
 - Risk assessment and price targets
@@ -22,7 +22,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from simple_trading_agent import SimpleTradingAgent, TradingAgentError
+from trading_agent import TradingAgent, TradingAgentError
 from config import Config, ConfigurationError
 from constants import (
     MAX_ANALYSIS_LENGTH,
@@ -31,6 +31,20 @@ from constants import (
     REPORT_SEPARATOR,
     DEFAULT_FILE_ENCODING,
     ANALYSIS_FILE_EXTENSION,
+    EMOJI_SEARCH,
+    EMOJI_ROBOT,
+    EMOJI_TIMER,
+    EMOJI_CHART,
+    EMOJI_ERROR,
+    EMOJI_FILE,
+    EMOJI_LIGHTNING,
+    EMOJI_CLOCK,
+    EMOJI_TARGET,
+    EMOJI_BRAIN,
+    EMOJI_BOOKS,
+    EMOJI_WARNING,
+    EMOJI_ROCKET,
+    EMOJI_CHART_UP,
 )
 
 # Configure logging
@@ -52,13 +66,13 @@ class TradingBot:
     comprehensive stock analysis through a Telegram interface.
     
     Attributes:
-        simple_trading_agent: Instance of SimpleTradingAgent for analysis
+        trading_agent: Instance of TradingAgent for analysis
         user_sessions: Dictionary to store user session data
     """
     
     def __init__(self) -> None:
         """Initialize the Trading Bot."""
-        self.simple_trading_agent = SimpleTradingAgent(
+        self.trading_agent = TradingAgent(
             Config.GLM_API_KEY,
             Config.FINNHUB_API_KEY,
             Config.OPENAI_API_KEY,
@@ -113,7 +127,7 @@ class TradingBot:
         # Validate command arguments
         if not context.args:
             await update.message.reply_text(
-                "❌ Please provide a stock symbol.\\n"
+                f"{EMOJI_ERROR} Please provide a stock symbol.\\n"
                 "Example: `/analyze AAPL`",
                 parse_mode='Markdown'
             )
@@ -124,17 +138,18 @@ class TradingBot:
         
         # Send loading message
         loading_msg = await update.message.reply_text(
-            self._get_loading_message(symbol)
+            self._get_loading_message(symbol),
+            parse_mode='Markdown'
         )
         
         try:
             # Perform analysis
-            analysis = await self.simple_trading_agent.analyze_stock(symbol)
+            analysis = await self.trading_agent.analyze_stock(symbol)
             
             # Check for errors
             if "error" in analysis:
                 await loading_msg.edit_text(
-                    f"❌ Error analyzing {symbol}: {analysis['error']}"
+                    f"{EMOJI_ERROR} Error analyzing {symbol}: {analysis['error']}"
                 )
                 logger.error(f"Analysis error for {symbol}: {analysis['error']}")
                 return
@@ -150,13 +165,13 @@ class TradingBot:
             logger.info(f"Successfully sent analysis for {symbol} to user {user_id}")
             
         except TradingAgentError as e:
-            error_msg = f"❌ Trading agent error for {symbol}: {str(e)}"
+            error_msg = f"{EMOJI_ERROR} Trading agent error for {symbol}: {str(e)}"
             await loading_msg.edit_text(error_msg)
             logger.error(error_msg, exc_info=True)
             
         except Exception as e:
             error_msg = (
-                f"❌ An unexpected error occurred while analyzing {symbol}. "
+                f"{EMOJI_ERROR} An unexpected error occurred while analyzing {symbol}. "
                 f"Please try again later."
             )
             await loading_msg.edit_text(error_msg)
@@ -203,7 +218,7 @@ class TradingBot:
                 await update.message.reply_document(
                     document=f,
                     filename=filename,
-                    caption=f"📄 Full comprehensive analysis for {symbol}"
+                    caption=f"{EMOJI_FILE} Full comprehensive analysis for {symbol}"
                 )
         finally:
             # Clean up temporary file
@@ -217,10 +232,10 @@ class TradingBot:
         Returns:
             Formatted welcome message
         """
-        return """
-🤖 **Welcome to Trading Agent Bot!**
+        return f"""
+{EMOJI_ROBOT} **Welcome to Trading Agent Bot!**
 
-I provide comprehensive stock analysis using the TradingAgents multi-agent framework powered by GLM-4.6.
+I provide comprehensive stock analysis using the TradingAgents multi-agent framework powered by GLM-4-32b-0414-128k.
 
 **Available Commands:**
 /analyze <symbol> - Get detailed stock analysis
@@ -231,7 +246,7 @@ I provide comprehensive stock analysis using the TradingAgents multi-agent frame
 /analyze TSLA
 /analyze MSFT
 
-Let's start trading! 📈
+Let's start trading! {EMOJI_CHART_UP}
 """
     
     @staticmethod
@@ -241,8 +256,8 @@ Let's start trading! 📈
         Returns:
             Formatted help text
         """
-        return """
-📚 **Bot Commands:**
+        return f"""
+{EMOJI_BOOKS} **Bot Commands:**
 
 /analyze <symbol> - Get comprehensive stock analysis
 • Example: `/analyze AAPL`
@@ -265,7 +280,7 @@ Let's start trading! 📈
 3. Risk assessment is performed
 4. Final recommendation is generated
 
-⚠️ **Disclaimer:** This bot provides educational information only. 
+{EMOJI_WARNING} **Disclaimer:** This bot provides educational information only. 
 Always conduct your own research before making investment decisions.
 """
     
@@ -280,10 +295,10 @@ Always conduct your own research before making investment decisions.
             Formatted loading message
         """
         return (
-            f"🔍 **Analyzing {symbol}**\\n\\n"
-            f"🤖 Multiple AI agents are working...\\n"
-            f"⏱️ This may take 2-3 minutes\\n"
-            f"📊 Running comprehensive analysis\\n\\n"
+            f"{EMOJI_SEARCH} **Analyzing {symbol}**\\n\\n"
+            f"{EMOJI_ROBOT} Multiple AI agents are working...\\n"
+            f"{EMOJI_TIMER} This may take 2-3 minutes\\n"
+            f"{EMOJI_CHART} Running comprehensive analysis\\n\\n"
             f"Please wait..."
         )
     
@@ -319,21 +334,21 @@ Always conduct your own research before making investment decisions.
         return f"""
 {rec_emoji} {symbol} - TradingAgents Analysis
 
-📊 Current Price: ${current_price:.2f} ({price_change:+.2f}%)
+{EMOJI_CHART} Current Price: ${current_price:.2f} ({price_change:+.2f}%)
 
-🎯 Recommendation:
+{EMOJI_TARGET} Recommendation:
 • Action: {recommendation}
 • Confidence: {confidence}/10
 • Risk Level: {risk_level}
 • Price Target: ${price_target:.2f}
 
-🧠 TradingAgents Analysis:
+{EMOJI_BRAIN} TradingAgents Analysis:
 {reasons_text}
 
-⚡ Analysis Type: {analysis.get('analysis_type', 'TRADING_AGENTS')}
-🕐 Generated: {analysis.get('timestamp', 'Unknown')[:19]}
+{EMOJI_LIGHTNING} Analysis Type: {analysis.get('analysis_type', 'TRADING_AGENTS')}
+{EMOJI_CLOCK} Generated: {analysis.get('timestamp', 'Unknown')[:19]}
 
-📄 See attached file for complete detailed analysis.
+{EMOJI_FILE} See attached file for complete detailed analysis.
 """
     
     @staticmethod
@@ -391,7 +406,7 @@ COMPREHENSIVE STOCK ANALYSIS REPORT
 Symbol: {symbol}
 Generated: {timestamp}
 Analysis Type: {analysis.get('analysis_type', 'TRADING_AGENTS')}
-Powered by: TradingAgents Multi-Agent Framework + GLM-4.6 (Z.AI)
+Powered by: TradingAgents Multi-Agent Framework + GLM-4-32b-0414-128k (Z.AI)
 
 {REPORT_SEPARATOR}
 MARKET DATA
@@ -425,7 +440,7 @@ Always do your own research and consult with a qualified financial advisor befor
 making investment decisions. Past performance does not guarantee future results.
 
 Generated by Trading Agent Bot using:
-- GLM-4.6 (Z.AI) for analysis
+- GLM-4-32b-0414-128k (Z.AI) for analysis
 - TradingAgents multi-agent framework
 - yfinance for market data
 
@@ -467,7 +482,7 @@ END OF REPORT
         
         if update and update.effective_message:
             await update.effective_message.reply_text(
-                "❌ An unexpected error occurred. Please try again later."
+                f"{EMOJI_ERROR} An unexpected error occurred. Please try again later."
             )
 
 

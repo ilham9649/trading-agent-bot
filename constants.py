@@ -47,6 +47,22 @@ RECOMMENDATION_EMOJIS: Final[dict] = {
     RECOMMENDATION_HOLD: '🟡',
 }
 
+# Message Emojis (using Unicode escapes for better compatibility)
+EMOJI_SEARCH: Final[str] = '\U0001F50D'  # 🔍
+EMOJI_ROBOT: Final[str] = '\U0001F916'  # 🤖
+EMOJI_TIMER: Final[str] = '\U000023F1'  # ⏱️
+EMOJI_CHART: Final[str] = '\U0001F4CA'  # 📊
+EMOJI_ERROR: Final[str] = '\U0000274C'  # ❌
+EMOJI_FILE: Final[str] = '\U0001F4C4'  # 📄
+EMOJI_LIGHTNING: Final[str] = '\U000026A1'  # ⚡
+EMOJI_CLOCK: Final[str] = '\U0001F550'  # 🕐
+EMOJI_TARGET: Final[str] = '\U0001F3AF'  # 🎯
+EMOJI_BRAIN: Final[str] = '\U0001F9E0'  # 🧠
+EMOJI_BOOKS: Final[str] = '\U0001F4DA'  # 📚
+EMOJI_WARNING: Final[str] = '\U000026A0'  # ⚠️
+EMOJI_ROCKET: Final[str] = '\U0001F680'  # 🚀
+EMOJI_CHART_UP: Final[str] = '\U0001F4C8'  # 📈
+
 # File Settings
 ANALYSIS_FILE_EXTENSION: Final[str] = '.txt'
 DEFAULT_FILE_ENCODING: Final[str] = 'utf-8'
@@ -65,7 +81,7 @@ TRADINGAGENTS_MAX_DEBATE_ROUNDS: Final[int] = 1
 TRADINGAGENTS_DATA_VENDOR: Final[str] = 'yfinance'
 
 # GLM API Settings
-GLM_MODEL_VERSION: Final[str] = 'glm-4.6'
+GLM_MODEL_VERSION: Final[str] = 'glm-4-32b-0414-128k'
 GLM_API_BASE_URL: Final[str] = 'https://api.z.ai/api/paas/v4/'
 
 # OpenAI Settings
