@@ -1,0 +1,142 @@
+
+================================================================================
+                    YOUR QUESTION - QUICK ANSWER
+================================================================================
+
+Q: When I run:
+   python run_backtest.py --symbol AAPL --start 2024-07-01 --end 2024-10-01
+   
+   Does the bot trigger once or several times?
+
+A: The bot triggers SEVERAL TIMES - specifically 64 TIMES!
+   (Once for each trading day in the period)
+
+================================================================================
+                         WHAT HAPPENS
+================================================================================
+
+July 1 - October 1, 2024 = 92 calendar days
+                          = 64 TRADING days (excluding weekends/holidays)
+
+For each of the 64 trading days:
+  
+  Day 1 (2024-07-01):
+    ├─ Fetch price: $210.62
+    ├─ Run TradingAgent analysis (2-3 minutes)
+    │  ├─ Get news from 2024-07-01
+    │  ├─ Get sentiment from 2024-07-01
+    │  ├─ Calculate indicators as of 2024-07-01
+    │  └─ Make decision: BUY/SELL/HOLD
+    └─ Execute trade if conditions met
+  
+  Day 2 (2024-07-02):
+    ├─ Fetch price: $212.34
+    ├─ Run TradingAgent analysis (2-3 minutes)
+    └─ Make decision and execute
+  
+  ... continues for ALL 64 days ...
+  
+  Day 64 (2024-09-30):
+    ├─ Fetch price: $233.00
+    ├─ Run TradingAgent analysis (2-3 minutes)
+    └─ Make decision and execute
+
+================================================================================
+                         TIME & COSTS
+================================================================================
+
+Bot Triggers:        64 times (once per trading day)
+Time per Trigger:    2-3 minutes (full agent analysis)
+Total Time:          ~2.7 hours (160 minutes)
+
+API Calls:
+  - Per day:         ~8 calls (GLM, OpenAI, Alpha Vantage)
+  - Total:           ~512 calls for 64 days
+
+================================================================================
+                           WHY?
+================================================================================
+
+This simulates REAL trading:
+  ✅ You don't make ONE decision for 3 months
+  ✅ You evaluate the market DAILY
+  ✅ Each day has new news, sentiment, prices
+  ✅ You respond to changing conditions
+
+The backtest does the same:
+  ✅ Analyzes every trading day
+  ✅ Makes daily trading decisions  
+  ✅ Tracks portfolio value over time
+  ✅ Builds complete trade history
+
+================================================================================
+                      EXAMPLE OUTPUT
+================================================================================
+
+You'll see this 64 times:
+
+Processing Day 1/64: 2024-07-01
+  Price: $210.62
+  Analyzing... (2-3 minutes)
+  Decision: BUY (confidence 8/10)
+  Trade: Bought 100 shares @ $210.62
+
+Processing Day 2/64: 2024-07-02
+  Price: $212.34
+  Analyzing... (2-3 minutes)
+  Decision: HOLD (confidence 6/10)
+  Trade: No action
+
+...continues for all 64 days...
+
+Processing Day 64/64: 2024-09-30
+  Price: $233.00
+  Analyzing... (2-3 minutes)
+  Decision: SELL (confidence 7/10)
+  Trade: Sold 100 shares @ $233.00
+
+Final Result:
+  Portfolio Value: $125,234.50
+  Total Return: +25.23%
+
+================================================================================
+                    QUICK COMPARISONS
+================================================================================
+
+Command                           Trading Days    Time        API Calls
+------------------------------------------------------------------------
+backtest_quick.py AAPL 5          ~5 days        12 min      ~40
+backtest_quick.py AAPL 10         ~10 days       25 min      ~80
+backtest_quick.py AAPL 30         ~22 days       55 min      ~176
+Your command (July-Oct)           ~64 days       2.7 hrs     ~512
+Full year backtest                ~252 days      10.5 hrs    ~2016
+
+================================================================================
+                      RECOMMENDATIONS
+================================================================================
+
+First Time:
+  python backtest_quick.py AAPL 5
+  → Quick test, low cost, verify it works
+
+After Validation:
+  python run_backtest.py --symbol AAPL --start 2024-07-01 --end 2024-10-01
+  → Your full 3-month backtest
+
+================================================================================
+                        BOTTOM LINE
+================================================================================
+
+Your command will:
+  ✅ Trigger the bot 64 TIMES (not once!)
+  ✅ Analyze EVERY trading day in the period
+  ✅ Make daily BUY/SELL/HOLD decisions
+  ✅ Take approximately 2.7 hours to complete
+  ✅ Use approximately 512 API calls
+
+This is CORRECT behavior - it simulates real daily trading! ✅
+
+================================================================================
+
+Read more: BACKTEST_EXECUTION_EXPLAINED.md
+

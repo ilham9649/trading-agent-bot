@@ -1,0 +1,49 @@
+📁 BACKTESTING SYSTEM FILES
+============================
+
+Core Backtesting Engine:
+------------------------
+✅ backtesting.py                 (17,946 bytes) - Main backtesting engine with portfolio simulation
+✅ run_backtest.py                (8,719 bytes)  - Full-featured CLI for backtesting
+✅ backtest_quick.py              (1,636 bytes)  - Quick backtest script for rapid testing
+✅ visualize_backtest.py          (9,615 bytes)  - Generate visual reports and charts
+✅ test_backtest_setup.py         (6,723 bytes)  - Verify environment is ready
+
+Documentation:
+--------------
+✅ BACKTESTING_README.md          (9,492 bytes)  - Comprehensive guide
+✅ BACKTEST_QUICKSTART.md         (5,168 bytes)  - 5-minute quick start
+✅ BACKTESTING_SUMMARY.md         (11,234 bytes) - Technical overview
+✅ BACKTESTING_FILES.txt          (this file)    - File listing
+
+Helper Scripts:
+---------------
+✅ backtest_example.sh            (2,650 bytes)  - Interactive menu with examples
+
+Output Directory:
+-----------------
+📂 backtest_results/              (created automatically)
+   ├── *.json                     (detailed results)
+   ├── *.csv                      (trade logs)
+   └── *.png                      (visualizations)
+
+Log Files:
+----------
+📄 backtest.log                   (created during runs)
+
+TOTAL: 9 new files + 1 directory
+============================
+
+Quick Commands:
+---------------
+Test setup:      python test_backtest_setup.py
+Quick backtest:  python backtest_quick.py AAPL 30
+Full backtest:   python run_backtest.py --symbol AAPL --start 2024-01-01 --end 2024-10-01
+Visualize:       python visualize_backtest.py backtest_results/backtest_*.json
+Interactive:     ./backtest_example.sh
+
+Documentation:
+--------------
+Start here:      BACKTEST_QUICKSTART.md
+Full guide:      BACKTESTING_README.md
+Overview:        BACKTESTING_SUMMARY.md

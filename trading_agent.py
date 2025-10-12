@@ -211,11 +211,13 @@ class TradingAgent:
             logger.error(f"Failed to initialize TradingAgents: {e}", exc_info=True)
             raise TradingAgentError(f"Initialization failed: {e}")
     
-    async def analyze_stock(self, symbol: str) -> Dict[str, Any]:
+    async def analyze_stock(self, symbol: str, trade_date: Optional[str] = None) -> Dict[str, Any]:
         """Analyze a stock using TradingAgents framework.
         
         Args:
             symbol: Stock ticker symbol (e.g., 'AAPL')
+            trade_date: Optional date for historical analysis (YYYY-MM-DD format)
+                       If None, uses current date. For backtesting, pass historical date.
             
         Returns:
             Dictionary containing analysis results with keys:
@@ -237,29 +239,28 @@ class TradingAgent:
             raise TradingAgentError("TradingAgents not properly initialized")
         
         try:
-            # Use a date within the LLM's training window to avoid "future date" errors
-            # The LLM was trained up to Oct 2023, so use a date in that range
-            # This is a workaround for the TradingAgents framework limitation
-            analysis_date = "2023-10-11"  # Use date within LLM training window
-            actual_date = datetime.now().strftime("%Y-%m-%d")
+            # Use provided date for backtesting, otherwise use current date
+            current_date = trade_date if trade_date else datetime.now().strftime("%Y-%m-%d")
             
-            logger.info(f"Starting analysis for {symbol} (using date {analysis_date} for LLM compatibility)")
+            logger.info(f"Analyzing {symbol} for date: {current_date}")
+            if trade_date:
+                logger.info(f"BACKTEST MODE: Using historical date {current_date}")
+                logger.info(f"News and data will be fetched for this date")
+            
+            logger.info(f"Starting analysis for {symbol} on {current_date}")
             
             # Run TradingAgents analysis in thread pool
             result, decision = await asyncio.to_thread(
                 self.trading_agents.propagate,
                 symbol,
-                analysis_date
+                current_date
             )
             
             logger.info(f"Analysis completed for {symbol}: {decision}")
             logger.debug(f"Result type: {type(result)}, Decision: {decision}")
             
-            # Format and return results (use actual date in output)
-            formatted_result = self._format_analysis_result(symbol, result, decision)
-            formatted_result['timestamp'] = datetime.now().isoformat()
-            
-            return formatted_result
+            # Format and return results
+            return self._format_analysis_result(symbol, result, decision)
             
         except Exception as e:
             logger.error(
