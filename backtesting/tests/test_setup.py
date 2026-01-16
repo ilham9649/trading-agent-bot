@@ -10,6 +10,8 @@ Usage:
 import sys
 from pathlib import Path
 
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 def print_status(check_name: str, passed: bool, message: str = ""):
     """Print check status with emoji."""
@@ -54,10 +56,8 @@ def check_files():
         "trading_agent.py",
         "config.py",
         "constants.py",
-        "backtesting.py",
         "run_backtest.py",
         "backtest_quick.py",
-        "visualize_backtest.py",
         ".env",
     ]
     

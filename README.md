@@ -32,12 +32,15 @@ A sophisticated Telegram bot that provides financial recommendations using AI an
 ### 1. Clone and Setup
 
 ```bash
+# Clone the main repository
 git clone https://github.com/ilham9649/trading-agent-bot.git
 cd trading-agent-bot
 
-# Clone TradingAgents library
+# ⚠️ IMPORTANT: Clone TradingAgents library (required - not available via pip)
 git clone https://github.com/TauricResearch/TradingAgents.git
 ```
+
+**Note**: TradingAgents must be cloned locally as it's not available as a standard pip package. The `trading_agent.py` module will automatically add this directory to the Python path.
 
 ### 2. Environment Configuration
 
