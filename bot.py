@@ -14,6 +14,7 @@ import logging
 import os
 from typing import Optional
 from pathlib import Path
+import mistune
 
 from telegram import Update
 from telegram.ext import (
@@ -453,6 +454,11 @@ Always conduct your own research before making investment decisions.
             RECOMMENDATION_EMOJIS[RECOMMENDATION_HOLD]
         )
         
+        # Convert markdown to HTML using mistune
+        markdown = mistune.create_markdown()
+        def markdown_to_html(text: str) -> str:
+            return markdown(text)
+        
         # Format agent reports section
         agent_section = ""
         if agent_reports:
@@ -460,23 +466,14 @@ Always conduct your own research before making investment decisions.
             agent_section += "<h2>Individual Agent Reports</h2>\n"
             
             for idx, (agent_name, report) in enumerate(agent_reports.items(), 1):
-                agent_section += f"<div class='agent-report'>\n"
+                agent_section += "<div class='agent-report'>\n"
                 agent_section += f"<h3>Agent {idx}: {agent_name}</h3>\n"
-                agent_section += f"<div class='report-content'>{report}</div>\n"
+                agent_section += f"<div class='report-content'>{markdown_to_html(report)}</div>\n"
                 agent_section += "</div>\n\n"
             
             agent_section += "</div>\n\n"
         
-        # Escape HTML special characters in report text
-        def escape_html(text: str) -> str:
-            return (str(text)
-                    .replace('&', '&amp;')
-                    .replace('<', '&lt;')
-                    .replace('>', '&gt;')
-                    .replace('"', '&quot;')
-                    .replace("'", '&#39;'))
-        
-        reasons_escaped = escape_html(reasons)
+        reasons_escaped = markdown_to_html(reasons)
         
         # Create comprehensive HTML report
         return f"""<!DOCTYPE html>
@@ -546,8 +543,8 @@ Always conduct your own research before making investment decisions.
             border-left: 4px solid #FF9800;
         }}
         .report-content {{
-            white-space: pre-wrap;
             color: #333;
+            line-height: 1.8;
         }}
         .disclaimer {{
             background-color: #ffebee;
