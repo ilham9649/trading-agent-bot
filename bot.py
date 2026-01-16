@@ -15,10 +15,11 @@ import os
 from typing import Optional
 from pathlib import Path
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
+    CallbackQueryHandler,
     ContextTypes,
 )
 
@@ -93,7 +94,8 @@ class TradingBot:
             context: Callback context
         """
         welcome_message = self._get_welcome_message()
-        await update.message.reply_text(welcome_message, parse_mode='Markdown')
+        keyboard = self._create_welcome_keyboard()
+        await update.message.reply_text(welcome_message, parse_mode='HTML', reply_markup=keyboard)
         logger.info(f"User {update.effective_user.id} started the bot")
     
     async def help_command(
@@ -108,7 +110,8 @@ class TradingBot:
             context: Callback context
         """
         help_text = self._get_help_text()
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+        keyboard = self._create_help_keyboard()
+        await update.message.reply_text(help_text, parse_mode='HTML', reply_markup=keyboard)
         logger.info(f"User {update.effective_user.id} requested help")
     
     async def analyze_stock(
@@ -127,19 +130,24 @@ class TradingBot:
         # Validate command arguments
         if not context.args:
             await update.message.reply_text(
-                f"{EMOJI_ERROR} Please provide a stock symbol.\\n"
-                "Example: `/analyze AAPL`",
-                parse_mode='Markdown'
+                f"{EMOJI_ERROR} Please provide a stock symbol.\n"
+                f"Example: <code>/analyze AAPL</code>",
+                parse_mode='HTML'
             )
             return
         
         symbol = context.args[0].upper()
         logger.info(f"User {user_id} requested analysis for {symbol}")
         
+        # Save last analyzed symbol
+        if user_id not in self.user_sessions:
+            self.user_sessions[user_id] = {'saved_analyses': [], 'last_symbol': None}
+        self.user_sessions[user_id]['last_symbol'] = symbol
+        
         # Send loading message
         loading_msg = await update.message.reply_text(
             self._get_loading_message(symbol),
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
         
         try:
@@ -202,6 +210,9 @@ class TradingBot:
         full_analysis_text = self._create_full_analysis_text(analysis)
         filename = self._generate_filename(symbol, analysis.get('timestamp', ''))
         
+        # Create keyboard for analysis results
+        keyboard = self._create_analysis_keyboard(symbol)
+        
         # Write to temporary file
         temp_file_path = Path(filename)
         try:
@@ -210,15 +221,16 @@ class TradingBot:
                 encoding=DEFAULT_FILE_ENCODING
             )
             
-            # Send summary message
-            await loading_msg.edit_text(summary)
+            # Send summary message with keyboard
+            await loading_msg.edit_text(summary, parse_mode='HTML', reply_markup=keyboard)
             
             # Send full analysis as file
             with open(temp_file_path, 'rb') as f:
                 await update.message.reply_document(
                     document=f,
                     filename=filename,
-                    caption=f"{EMOJI_FILE} Full comprehensive analysis for {symbol}"
+                    caption=f"{EMOJI_FILE} Full comprehensive analysis for <b>{symbol}</b>",
+                    parse_mode='HTML'
                 )
         finally:
             # Clean up temporary file
@@ -233,18 +245,18 @@ class TradingBot:
             Formatted welcome message
         """
         return f"""
-{EMOJI_ROBOT} **Welcome to Trading Agent Bot!**
+{EMOJI_ROBOT} <b>Welcome to Trading Agent Bot!</b>
 
 I provide comprehensive stock analysis using the TradingAgents multi-agent framework powered by GLM-4-32b-0414-128k.
 
-**Available Commands:**
-/analyze <symbol> - Get detailed stock analysis
+<b>Available Commands:</b>
+/analyze &lt;symbol&gt; - Get detailed stock analysis
 /help - Show detailed help
 
-**Example:**
-/analyze AAPL
-/analyze TSLA
-/analyze MSFT
+<b>Example:</b>
+<code>/analyze AAPL</code>
+<code>/analyze TSLA</code>
+<code>/analyze MSFT</code>
 
 Let's start trading! {EMOJI_CHART_UP}
 """
@@ -257,30 +269,30 @@ Let's start trading! {EMOJI_CHART_UP}
             Formatted help text
         """
         return f"""
-{EMOJI_BOOKS} **Bot Commands:**
+{EMOJI_BOOKS} <b>Bot Commands:</b>
 
-/analyze <symbol> - Get comprehensive stock analysis
-• Example: `/analyze AAPL`
+<b>/analyze &lt;symbol&gt;</b> - Get comprehensive stock analysis
+• Example: <code>/analyze AAPL</code>
 • Uses TradingAgents multi-agent framework
 • Includes technical, fundamental, and sentiment analysis
 • Analysis takes 2-3 minutes
 
-/help - Show this help message
+<b>/help</b> - Show this help message
 
-**What you get:**
+<b>What you get:</b>
 • Current price and price changes
 • BUY/SELL/HOLD recommendation with confidence level
 • Price target and risk assessment
 • Comprehensive AI analysis from multiple specialized agents
 • Full detailed report as downloadable file
 
-**Analysis Process:**
+<b>Analysis Process:</b>
 1. Multiple AI agents analyze the stock
 2. Agents debate and reach consensus
 3. Risk assessment is performed
 4. Final recommendation is generated
 
-{EMOJI_WARNING} **Disclaimer:** This bot provides educational information only. 
+{EMOJI_WARNING} <b>Disclaimer:</b> This bot provides educational information only. 
 Always conduct your own research before making investment decisions.
 """
     
@@ -295,10 +307,10 @@ Always conduct your own research before making investment decisions.
             Formatted loading message
         """
         return (
-            f"{EMOJI_SEARCH} **Analyzing {symbol}**\\n\\n"
-            f"{EMOJI_ROBOT} Multiple AI agents are working...\\n"
-            f"{EMOJI_TIMER} This may take 2-3 minutes\\n"
-            f"{EMOJI_CHART} Running comprehensive analysis\\n\\n"
+            f"{EMOJI_SEARCH} <b>Analyzing {symbol}</b>\n\n"
+            f"{EMOJI_ROBOT} Multiple AI agents are working...\n"
+            f"{EMOJI_TIMER} This may take 2-3 minutes\n"
+            f"{EMOJI_CHART} Running comprehensive analysis\n\n"
             f"Please wait..."
         )
     
@@ -332,21 +344,21 @@ Always conduct your own research before making investment decisions.
         
         # Format response
         return f"""
-{rec_emoji} {symbol} - TradingAgents Analysis
+{rec_emoji} <b>{symbol} - TradingAgents Analysis</b>
 
-{EMOJI_CHART} Current Price: ${current_price:.2f} ({price_change:+.2f}%)
+{EMOJI_CHART} <b>Current Price:</b> ${current_price:.2f} ({price_change:+.2f}%)
 
-{EMOJI_TARGET} Recommendation:
-• Action: {recommendation}
-• Confidence: {confidence}/10
-• Risk Level: {risk_level}
-• Price Target: ${price_target:.2f}
+{EMOJI_TARGET} <b>Recommendation:</b>
+• <b>Action:</b> <code>{recommendation}</code>
+• <b>Confidence:</b> {confidence}/10
+• <b>Risk Level:</b> {risk_level}
+• <b>Price Target:</b> ${price_target:.2f}
 
-{EMOJI_BRAIN} TradingAgents Analysis:
+{EMOJI_BRAIN} <b>TradingAgents Analysis:</b>
 {reasons_text}
 
-{EMOJI_LIGHTNING} Analysis Type: {analysis.get('analysis_type', 'TRADING_AGENTS')}
-{EMOJI_CLOCK} Generated: {analysis.get('timestamp', 'Unknown')[:19]}
+{EMOJI_LIGHTNING} <b>Analysis Type:</b> {analysis.get('analysis_type', 'TRADING_AGENTS')}
+{EMOJI_CLOCK} <b>Generated:</b> {analysis.get('timestamp', 'Unknown')[:19]}
 
 {EMOJI_FILE} See attached file for complete detailed analysis.
 """
@@ -464,6 +476,69 @@ END OF REPORT
         date_str = timestamp[:10] if timestamp else 'unknown'
         return f"{symbol}_analysis_{date_str}{ANALYSIS_FILE_EXTENSION}"
     
+    @staticmethod
+    def _create_welcome_keyboard() -> InlineKeyboardMarkup:
+        """Create inline keyboard for welcome message.
+        
+        Returns:
+            InlineKeyboardMarkup: Keyboard with welcome options
+        """
+        keyboard = [
+            [
+                InlineKeyboardButton("📊 Quick Analyze", callback_data='analyze_quick'),
+                InlineKeyboardButton("📚 Help", callback_data='help'),
+            ],
+            [
+                InlineKeyboardButton("ℹ️ About Bot", callback_data='about'),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+    
+    def _create_analysis_keyboard(self, symbol: str) -> InlineKeyboardMarkup:
+        """Create inline keyboard for analysis results.
+        
+        Args:
+            symbol: Stock ticker symbol
+            
+        Returns:
+            InlineKeyboardMarkup: Keyboard with analysis options
+        """
+        keyboard = [
+            [
+                InlineKeyboardButton("🔄 Analyze Another", callback_data='analyze_another'),
+                InlineKeyboardButton("📊 View Details", callback_data=f'view_details:{symbol}'),
+            ],
+            [
+                InlineKeyboardButton("📁 Download Report", callback_data=f'download:{symbol}'),
+            ],
+            [
+                InlineKeyboardButton("💾 Save", callback_data=f'save:{symbol}'),
+                InlineKeyboardButton("🗑️ Delete", callback_data='delete'),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+    
+    @staticmethod
+    def _create_help_keyboard() -> InlineKeyboardMarkup:
+        """Create inline keyboard for help message.
+        
+        Returns:
+            InlineKeyboardMarkup: Keyboard with help options
+        """
+        keyboard = [
+            [
+                InlineKeyboardButton("⚙️ Settings", callback_data='settings'),
+                InlineKeyboardButton("📈 Commands", callback_data='commands'),
+            ],
+            [
+                InlineKeyboardButton("📊 Quick Analyze", callback_data='analyze_quick'),
+            ],
+            [
+                InlineKeyboardButton("🔙 Back to Menu", callback_data='menu'),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+    
     async def error_handler(
         self,
         update: Update,
@@ -484,6 +559,181 @@ END OF REPORT
             await update.effective_message.reply_text(
                 f"{EMOJI_ERROR} An unexpected error occurred. Please try again later."
             )
+    
+    async def handle_callback_query(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """Handle inline keyboard button presses.
+        
+        Args:
+            update: Telegram update object
+            context: Callback context
+        """
+        query = update.callback_query
+        await query.answer()
+        
+        callback_data = query.data
+        user_id = update.effective_user.id
+        
+        logger.info(f"User {user_id} pressed button: {callback_data}")
+        
+        if callback_data == 'analyze_quick':
+            await self._prompt_symbol(query)
+        elif callback_data == 'help':
+            help_text = self._get_help_text()
+            keyboard = self._create_help_keyboard()
+            await query.message.edit_text(help_text, parse_mode='HTML', reply_markup=keyboard)
+        elif callback_data == 'about':
+            await self._show_about(query)
+        elif callback_data == 'analyze_another':
+            await self._prompt_symbol(query)
+        elif callback_data.startswith('view_details:'):
+            symbol = callback_data.split(':')[1]
+            await self._show_detailed_info(query, symbol)
+        elif callback_data.startswith('download:'):
+            symbol = callback_data.split(':')[1]
+            await query.answer(f"📁 Report for {symbol} is attached to the message above")
+        elif callback_data.startswith('save:'):
+            symbol = callback_data.split(':')[1]
+            await self._save_analysis(query, symbol, user_id)
+        elif callback_data == 'delete':
+            await self._delete_message(query)
+        elif callback_data == 'menu':
+            await self._show_menu(query)
+        elif callback_data == 'settings':
+            await self._show_settings(query)
+        elif callback_data == 'commands':
+            await self._show_commands(query)
+    
+    async def _prompt_symbol(self, query) -> None:
+        """Prompt user to enter stock symbol.
+        
+        Args:
+            query: Callback query object
+        """
+        await query.message.edit_text(
+            f"📊 <b>Enter stock symbol to analyze:</b>\n\n"
+            f"Example: <code>AAPL</code>, <code>TSLA</code>, <code>MSFT</code>\n\n"
+            f"Type the symbol now or use /analyze &lt;symbol&gt;",
+            parse_mode='HTML'
+        )
+    
+    async def _show_about(self, query) -> None:
+        """Show bot information.
+        
+        Args:
+            query: Callback query object
+        """
+        about_text = (
+            f"ℹ️ <b>About Trading Agent Bot</b>\n\n"
+            f"Version: <code>1.0.0</code>\n"
+            f"Powered by: <b>TradingAgents</b> + <b>GLM-4</b>\n\n"
+            f"<b>Features:</b>\n"
+            f"• AI-powered stock analysis\n"
+            f"• Multi-agent consensus system\n"
+            f"• Real-time market data\n"
+            f"• Comprehensive reports\n\n"
+            f"<i>Built with ❤️ for traders</i>"
+        )
+        keyboard = self._create_welcome_keyboard()
+        await query.message.edit_text(about_text, parse_mode='HTML', reply_markup=keyboard)
+    
+    async def _show_detailed_info(self, query, symbol: str) -> None:
+        """Show detailed information about a symbol.
+        
+        Args:
+            query: Callback query object
+            symbol: Stock ticker symbol
+        """
+        info_text = (
+            f"📊 <b>Detailed Information for {symbol}</b>\n\n"
+            f"To get the full analysis, use:\n"
+            f"<code>/analyze {symbol}</code>\n\n"
+            f"This will provide:\n"
+            f"• Current price and price changes\n"
+            f"• BUY/SELL/HOLD recommendation\n"
+            f"• Confidence level and risk assessment\n"
+            f"• Price targets\n"
+            f"• Comprehensive AI analysis from multiple agents"
+        )
+        keyboard = self._create_welcome_keyboard()
+        await query.message.edit_text(info_text, parse_mode='HTML', reply_markup=keyboard)
+    
+    async def _save_analysis(self, query, symbol: str, user_id: int) -> None:
+        """Save analysis to user history.
+        
+        Args:
+            query: Callback query object
+            symbol: Stock ticker symbol
+            user_id: User's Telegram ID
+        """
+        if user_id not in self.user_sessions:
+            self.user_sessions[user_id] = {'saved_analyses': [], 'last_symbol': None}
+        
+        self.user_sessions[user_id]['saved_analyses'].append({
+            'symbol': symbol,
+            'timestamp': query.message.date.isoformat()
+        })
+        self.user_sessions[user_id]['last_symbol'] = symbol
+        
+        await query.answer(f"💾 Analysis for {symbol} saved!")
+        logger.info(f"User {user_id} saved analysis for {symbol}")
+    
+    async def _delete_message(self, query) -> None:
+        """Delete the current message.
+        
+        Args:
+            query: Callback query object
+        """
+        await query.message.delete()
+    
+    async def _show_menu(self, query) -> None:
+        """Show main menu.
+        
+        Args:
+            query: Callback query object
+        """
+        welcome_msg = self._get_welcome_message()
+        keyboard = self._create_welcome_keyboard()
+        await query.message.edit_text(welcome_msg, parse_mode='HTML', reply_markup=keyboard)
+    
+    async def _show_settings(self, query) -> None:
+        """Show settings information.
+        
+        Args:
+            query: Callback query object
+        """
+        settings_text = (
+            f"⚙️ <b>Settings</b>\n\n"
+            f"Current bot settings:\n"
+            f"• Default Timeframe: <code>{Config.DEFAULT_TIMEFRAME}</code>\n"
+            f"• Log Level: <code>{Config.LOG_LEVEL}</code>\n"
+            f"• Max Recommendations: <code>{Config.MAX_RECOMMENDATIONS}</code>\n\n"
+            f"<i>Advanced settings can be configured in .env file</i>"
+        )
+        keyboard = self._create_welcome_keyboard()
+        await query.message.edit_text(settings_text, parse_mode='HTML', reply_markup=keyboard)
+    
+    async def _show_commands(self, query) -> None:
+        """Show available commands.
+        
+        Args:
+            query: Callback query object
+        """
+        commands_text = (
+            f"📈 <b>Available Commands</b>\n\n"
+            f"<code>/start</code> - Start the bot\n"
+            f"<code>/analyze &lt;symbol&gt;</code> - Analyze a stock\n"
+            f"<code>/help</code> - Show help information\n\n"
+            f"<b>Example:</b>\n"
+            f"<code>/analyze AAPL</code>\n"
+            f"<code>/analyze TSLA</code>\n"
+            f"<code>/analyze MSFT</code>"
+        )
+        keyboard = self._create_welcome_keyboard()
+        await query.message.edit_text(commands_text, parse_mode='HTML', reply_markup=keyboard)
 
 
 def main() -> None:
@@ -506,6 +756,9 @@ def main() -> None:
         application.add_handler(CommandHandler("start", bot.start))
         application.add_handler(CommandHandler("help", bot.help_command))
         application.add_handler(CommandHandler("analyze", bot.analyze_stock))
+        
+        # Add callback query handler for inline keyboards
+        application.add_handler(CallbackQueryHandler(bot.handle_callback_query))
         
         # Add error handler
         application.add_error_handler(bot.error_handler)

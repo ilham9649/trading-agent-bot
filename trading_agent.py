@@ -167,7 +167,7 @@ class TradingAgent:
         config["data_vendors"] = {
             "core_stock_apis": TRADINGAGENTS_DATA_VENDOR,
             "technical_indicators": TRADINGAGENTS_DATA_VENDOR,
-            "fundamental_data": TRADINGAGENTS_DATA_VENDOR,
+            "fundamental_data": "alpha_vantage",
             "news_data": "alpha_vantage",  # Alpha Vantage for news data
         }
         
