@@ -24,12 +24,13 @@ python bot.py
 python test_analysis.py [symbol]  # Default: AAPL
 python test_analysis.py AAPL
 
-# Quick backtest
-python backtest_quick.py
+# Quick backtest (recent 30 days)
+python backtest_quick.py AAPL 30
+python backtest_quick.py TSLA 60 50000  # symbol days [capital]
 
 # Full backtest with parameters
-python run_backtest.py --symbol AAPL --start 2024-01-01 --end 2024-10-01
-python run_backtest.py --symbol TSLA --start 2023-06-01 --end 2024-06-01 --capital 50000
+python backtest_full.py --symbol AAPL --start 2024-01-01 --end 2024-10-01
+python backtest_full.py --symbol TSLA --start 2023-06-01 --end 2024-06-01 --capital 50000
 ```
 
 ### Dependency Management
@@ -104,6 +105,11 @@ LOG_LEVEL=DEBUG
 - Validate config on startup with `Config.validate()`
 - Never log actual API keys - use masking: `key[:4]...key[-4:]`
 
+**Important Constants:**
+- `DEFAULT_HISTORY_PERIOD` (`'2d'`): Days of historical price data to fetch for price change calculations (hardcoded in constants.py)
+- `DEFAULT_TIMEFRAME` (`'1d'`): Default timeframe for stock data (configurable via `.env` file)
+- `MAX_ANALYSIS_LENGTH` (3496): Maximum Telegram message length (4096 - 600 overhead)
+
 ### Constants
 - All magic numbers/strings go in `constants.py`
 - Use `Final` type for constants: `MAX_ANALYSIS_LENGTH: Final[int] = 4096`
@@ -128,13 +134,64 @@ bot.py                 # Main Telegram bot entry point
 trading_agent.py       # TradingAgents integration
 config.py             # Configuration management
 constants.py          # All constants
+backtest_quick.py     # Wrapper for quick backtest
+backtest_full.py      # Wrapper for full backtest
+test_analysis.py      # Test analysis script
 backtesting/          # Backtesting module
-  - engine.py         # Backtest engine
-  - visualize.py      # Visualization tools
-  - run.py           # Backtest runner
+  - core/             # Core backtesting components
+    - engine.py       # Backtest engine
+  - scripts/          # Backtest runner scripts
+    - run.py          # Full backtest runner
+    - quick.py        # Quick backtest runner
+  - utils/            # Utility functions
+    - visualize.py    # Visualization tools
+  - tests/            # Test files
+  - results/          # Backtest results storage
 .env                 # Environment variables (not in git)
 .env.example         # Template for .env
 ```
+
+### Telegram Message Formatting
+
+#### HTML Formatting
+- All Telegram messages use `parse_mode='HTML'` - **NOT Markdown**
+- HTML tags: `<b>` for bold, `<code>` for inline code, `<i>` for italic
+- Escape special characters: Use `&lt;` for `<`, `&gt;` for `>`, `&amp;` for `&`
+- Example: `<code>/analyze AAPL</code>` displays as `/analyze AAPL`
+
+#### Message Structure
+- **Summary Message**: Sent directly to Telegram chat, contains:
+  - Current price and change
+  - Recommendation (Action, Confidence, Risk Level, Price Target)
+  - Brief summary (max 500 chars)
+  - Note to see full report in attachment
+  - Interactive keyboard buttons
+  
+- **Full Report Attachment**: Downloadable `.txt` file contains:
+  - All market data and recommendation details
+  - Complete detailed analysis
+  - **Individual Agent Reports** with clear separators:
+    - Market Analyst
+    - Fundamental Analyst
+    - News Analyst
+    - Sentiment Analyst
+    - Risk Analyst
+    - Investment Committee
+    - Trading Plan
+  - Disclaimer
+
+#### Interactive Keyboards
+- **Welcome Keyboard**: Analyze Stock, Help, About, Settings
+- **Help Keyboard**: Analyze Stock, Back to Menu
+- **Analysis Keyboard**: Compare Agents, Download Report, Save Analysis, Analyze Another, Close
+- Create keyboards using `InlineKeyboardButton` and `InlineKeyboardMarkup` from `telegram` library
+- Button callback data format: `action:param` (e.g., `compare_agents:AAPL`)
+
+#### Truncation
+- Use `_truncate_analysis_text(text, max_length)` to limit text length
+- Default `MAX_ANALYSIS_LENGTH` = 3496 (4096 - 600 overhead)
+- Tries to cut at sentence boundary (`.`) or newline (`\n`) for cleaner breaks
+- Appends `[See full report in attached file...]` when truncated
 
 ### Testing Notes
 - No pytest/unittest configured - tests are standalone scripts

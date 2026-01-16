@@ -333,10 +333,6 @@ Always conduct your own research before making investment decisions.
         risk_level = analysis.get('risk_level', 'MEDIUM')
         current_price = float(analysis.get('current_price', 0))
         price_change = float(analysis.get('price_change', 0))
-        agent_reports = analysis.get('agent_reports', {})
-        
-        # Truncate analysis text if needed
-        reasons_text = self._truncate_analysis_text(str(reasons))
         
         # Get emoji for recommendation
         rec_emoji = RECOMMENDATION_EMOJIS.get(
@@ -344,14 +340,12 @@ Always conduct your own research before making investment decisions.
             RECOMMENDATION_EMOJIS[RECOMMENDATION_HOLD]
         )
         
-        # Format multi-agent breakdown if available
-        agent_breakdown = ""
-        if agent_reports:
-            agent_breakdown = self._format_agent_breakdown(agent_reports)
+        # Truncate reasons to brief summary (max 500 chars)
+        reasons_text = self._truncate_analysis_text(str(reasons), max_length=500)
         
-        # Format response
+        # Format concise response (summary only)
         return f"""
-{rec_emoji} <b>{symbol} - Multi-Agent Analysis</b>
+{rec_emoji} <b>{symbol} - Analysis Summary</b>
 
 {EMOJI_CHART} <b>Current Price:</b> ${current_price:.2f} ({price_change:+.2f}%)
 
@@ -361,42 +355,42 @@ Always conduct your own research before making investment decisions.
 • <b>Risk Level:</b> {risk_level}
 • <b>Price Target:</b> ${price_target:.2f}
 
-{EMOJI_BRAIN} <b>Multi-Agent Consensus:</b>
+{EMOJI_BRAIN} <b>Summary:</b>
 {reasons_text}
 
-{agent_breakdown}
-
-{EMOJI_LIGHTNING} <b>Analysis Type:</b> {analysis.get('analysis_type', 'TRADING_AGENTS')}
-{EMOJI_CLOCK} <b>Generated:</b> {analysis.get('timestamp', 'Unknown')[:19]}
-
-{EMOJI_FILE} See attached file for complete detailed analysis.
+{EMOJI_FILE} <b>Full Report:</b> See attached file for detailed multi-agent analysis, individual agent reports, and complete findings.
 """
     
     @staticmethod
-    def _truncate_analysis_text(text: str) -> str:
-        """Truncate analysis text to fit Telegram limits.
+    def _truncate_analysis_text(text: str, max_length: Optional[int] = None) -> str:
+        """Truncate analysis text to fit limits.
         
         Args:
             text: Full analysis text
+            max_length: Maximum length to allow (defaults to MAX_ANALYSIS_LENGTH)
             
         Returns:
             Truncated text if necessary
         """
-        if len(text) <= MAX_ANALYSIS_LENGTH:
+        if max_length is None:
+            max_length = MAX_ANALYSIS_LENGTH
+            
+        if len(text) <= max_length:
             return text
         
         # Try to cut at sentence boundary
-        truncated = text[:MAX_ANALYSIS_LENGTH]
+        truncated = text[:max_length]
         last_period = truncated.rfind('.')
         last_newline = truncated.rfind('\\n')
         
         cut_point = max(last_period, last_newline)
         
         # Only use cut point if it's reasonably close to the limit
-        if cut_point > MAX_ANALYSIS_LENGTH - 500:
-            return text[:cut_point + 1] + "\\n\\n[Continued in attached file...]"
+        threshold = max_length - 500
+        if cut_point > threshold:
+            return text[:cut_point + 1] + "\\n\\n[See full report in attached file...]"
         else:
-            return truncated + "...\\n\\n[Continued in attached file...]"
+            return truncated + "...\\n\\n[See full report in attached file...]"
     
     @staticmethod
     def _format_agent_breakdown(agent_reports: dict) -> str:
@@ -454,6 +448,21 @@ Always conduct your own research before making investment decisions.
         risk_level = analysis.get('risk_level', 'MEDIUM')
         price_target = float(analysis.get('price_target', 0))
         reasons = analysis.get('reasons', 'No analysis available')
+        agent_reports = analysis.get('agent_reports', {})
+        
+        # Format agent reports section
+        agent_section = ""
+        if agent_reports:
+            agent_section = "\\n\\n" + REPORT_SEPARATOR + "\\n"
+            agent_section += "INDIVIDUAL AGENT REPORTS\\n"
+            agent_section += REPORT_SEPARATOR + "\\n\\n"
+            
+            for idx, (agent_name, report) in enumerate(agent_reports.items(), 1):
+                agent_section += f"[Agent {idx}] {agent_name}\\n"
+                agent_section += "-" * 80 + "\\n"
+                agent_section += f"{report}\\n\\n"
+                if idx < len(agent_reports):
+                    agent_section += REPORT_SEPARATOR + "\\n\\n"
         
         # Create comprehensive report
         return f"""
@@ -487,7 +496,7 @@ Risk Level: {risk_level}
 DETAILED ANALYSIS
 {REPORT_SEPARATOR}
 
-{reasons}
+{reasons}{agent_section}
 
 {REPORT_SEPARATOR}
 DISCLAIMER
