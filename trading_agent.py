@@ -162,6 +162,9 @@ class TradingAgent:
         config["quick_think_llm"] = GLM_MODEL_VERSION
         config["max_debate_rounds"] = TRADINGAGENTS_MAX_DEBATE_ROUNDS
         
+        # Set recursion limit to prevent infinite loops
+        config["recursion_limit"] = 200  # Increased from default 100
+        
         # Configure data vendors
         # Use yfinance for stock data, Alpha Vantage for news
         config["data_vendors"] = {
