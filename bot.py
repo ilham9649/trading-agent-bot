@@ -94,7 +94,7 @@ class TradingBot:
             context: Callback context
         """
         welcome_message = self._get_welcome_message()
-        await update.message.reply_text(welcome_message, parse_mode='HTML')
+        await update.effective_message.reply_text(welcome_message, parse_mode='HTML')
         logger.info(f"User {update.effective_user.id} started the bot")
     
     async def help_command(
@@ -109,7 +109,7 @@ class TradingBot:
             context: Callback context
         """
         help_text = self._get_help_text()
-        await update.message.reply_text(help_text, parse_mode='HTML')
+        await update.effective_message.reply_text(help_text, parse_mode='HTML')
         logger.info(f"User {update.effective_user.id} requested help")
     
     async def analyze_stock(
@@ -127,7 +127,7 @@ class TradingBot:
         
         # Validate command arguments
         if not context.args:
-            await update.message.reply_text(
+            await update.effective_message.reply_text(
                 f"{EMOJI_ERROR} Please provide a stock symbol.\n"
                 f"Example: <code>/analyze AAPL</code>",
                 parse_mode='HTML'
@@ -143,7 +143,7 @@ class TradingBot:
         self.user_sessions[user_id]['last_symbol'] = symbol
         
         # Send loading message
-        loading_msg = await update.message.reply_text(
+        loading_msg = await update.effective_message.reply_text(
             self._get_loading_message(symbol),
             parse_mode='HTML'
         )
@@ -224,7 +224,7 @@ class TradingBot:
             
             # Send full analysis as file
             with open(temp_file_path, 'rb') as f:
-                await update.message.reply_document(
+                await update.effective_message.reply_document(
                     document=f,
                     filename=filename,
                     caption=f"{EMOJI_FILE} Full comprehensive analysis for <b>{symbol}</b>",
