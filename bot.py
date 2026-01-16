@@ -94,8 +94,7 @@ class TradingBot:
             context: Callback context
         """
         welcome_message = self._get_welcome_message()
-        keyboard = self._create_welcome_keyboard()
-        await update.message.reply_text(welcome_message, parse_mode='HTML', reply_markup=keyboard)
+        await update.message.reply_text(welcome_message, parse_mode='HTML')
         logger.info(f"User {update.effective_user.id} started the bot")
     
     async def help_command(
@@ -110,8 +109,7 @@ class TradingBot:
             context: Callback context
         """
         help_text = self._get_help_text()
-        keyboard = self._create_help_keyboard()
-        await update.message.reply_text(help_text, parse_mode='HTML', reply_markup=keyboard)
+        await update.message.reply_text(help_text, parse_mode='HTML')
         logger.info(f"User {update.effective_user.id} requested help")
     
     async def analyze_stock(
@@ -141,7 +139,7 @@ class TradingBot:
         
         # Save last analyzed symbol
         if user_id not in self.user_sessions:
-            self.user_sessions[user_id] = {'saved_analyses': [], 'last_symbol': None}
+            self.user_sessions[user_id] = {'saved_analyses': [], 'last_symbol': None, 'last_analysis': None}
         self.user_sessions[user_id]['last_symbol'] = symbol
         
         # Send loading message
@@ -161,6 +159,9 @@ class TradingBot:
                 )
                 logger.error(f"Analysis error for {symbol}: {analysis['error']}")
                 return
+            
+            # Save analysis for agent comparison
+            self.user_sessions[user_id]['last_analysis'] = analysis
             
             # Format and send results
             await self._send_analysis_results(
@@ -210,9 +211,6 @@ class TradingBot:
         full_analysis_text = self._create_full_analysis_text(analysis)
         filename = self._generate_filename(symbol, analysis.get('timestamp', ''))
         
-        # Create keyboard for analysis results
-        keyboard = self._create_analysis_keyboard(symbol)
-        
         # Write to temporary file
         temp_file_path = Path(filename)
         try:
@@ -220,6 +218,9 @@ class TradingBot:
                 full_analysis_text,
                 encoding=DEFAULT_FILE_ENCODING
             )
+            
+            # Create keyboard for analysis actions
+            keyboard = self._create_analysis_keyboard(symbol)
             
             # Send summary message with keyboard
             await loading_msg.edit_text(summary, parse_mode='HTML', reply_markup=keyboard)
@@ -332,6 +333,7 @@ Always conduct your own research before making investment decisions.
         risk_level = analysis.get('risk_level', 'MEDIUM')
         current_price = float(analysis.get('current_price', 0))
         price_change = float(analysis.get('price_change', 0))
+        agent_reports = analysis.get('agent_reports', {})
         
         # Truncate analysis text if needed
         reasons_text = self._truncate_analysis_text(str(reasons))
@@ -342,9 +344,14 @@ Always conduct your own research before making investment decisions.
             RECOMMENDATION_EMOJIS[RECOMMENDATION_HOLD]
         )
         
+        # Format multi-agent breakdown if available
+        agent_breakdown = ""
+        if agent_reports:
+            agent_breakdown = self._format_agent_breakdown(agent_reports)
+        
         # Format response
         return f"""
-{rec_emoji} <b>{symbol} - TradingAgents Analysis</b>
+{rec_emoji} <b>{symbol} - Multi-Agent Analysis</b>
 
 {EMOJI_CHART} <b>Current Price:</b> ${current_price:.2f} ({price_change:+.2f}%)
 
@@ -354,8 +361,10 @@ Always conduct your own research before making investment decisions.
 • <b>Risk Level:</b> {risk_level}
 • <b>Price Target:</b> ${price_target:.2f}
 
-{EMOJI_BRAIN} <b>TradingAgents Analysis:</b>
+{EMOJI_BRAIN} <b>Multi-Agent Consensus:</b>
 {reasons_text}
+
+{agent_breakdown}
 
 {EMOJI_LIGHTNING} <b>Analysis Type:</b> {analysis.get('analysis_type', 'TRADING_AGENTS')}
 {EMOJI_CLOCK} <b>Generated:</b> {analysis.get('timestamp', 'Unknown')[:19]}
@@ -388,6 +397,43 @@ Always conduct your own research before making investment decisions.
             return text[:cut_point + 1] + "\\n\\n[Continued in attached file...]"
         else:
             return truncated + "...\\n\\n[Continued in attached file...]"
+    
+    @staticmethod
+    def _format_agent_breakdown(agent_reports: dict) -> str:
+        """Format individual agent reports for multi-agent analysis display.
+        
+        Args:
+            agent_reports: Dictionary of agent names to their reports
+            
+        Returns:
+            Formatted multi-agent breakdown text
+        """
+        if not agent_reports:
+            return ""
+        
+        sections = []
+        sections.append("\n" + "=" * 40)
+        sections.append("🔍 <b>Individual Agent Analysis:</b>")
+        sections.append("=" * 40 + "\n")
+        
+        # Display each agent's perspective with clear separation
+        for idx, (agent_name, report) in enumerate(agent_reports.items(), 1):
+            # Truncate very long reports
+            if len(report) > 200:
+                display_report = report[:200] + "..."
+            else:
+                display_report = report
+            
+            sections.append(f"<b>Agent {idx}: {agent_name}</b>")
+            sections.append("-" * 40)
+            sections.append(f"{display_report}")
+            
+            # Add separator between agents (except last one)
+            if idx < len(agent_reports):
+                sections.append("")
+        
+        sections.append("")
+        return "\n".join(sections)
     
     def _create_full_analysis_text(self, analysis: dict) -> str:
         """Create full detailed analysis text for file export.
@@ -476,69 +522,6 @@ END OF REPORT
         date_str = timestamp[:10] if timestamp else 'unknown'
         return f"{symbol}_analysis_{date_str}{ANALYSIS_FILE_EXTENSION}"
     
-    @staticmethod
-    def _create_welcome_keyboard() -> InlineKeyboardMarkup:
-        """Create inline keyboard for welcome message.
-        
-        Returns:
-            InlineKeyboardMarkup: Keyboard with welcome options
-        """
-        keyboard = [
-            [
-                InlineKeyboardButton("📊 Quick Analyze", callback_data='analyze_quick'),
-                InlineKeyboardButton("📚 Help", callback_data='help'),
-            ],
-            [
-                InlineKeyboardButton("ℹ️ About Bot", callback_data='about'),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    
-    def _create_analysis_keyboard(self, symbol: str) -> InlineKeyboardMarkup:
-        """Create inline keyboard for analysis results.
-        
-        Args:
-            symbol: Stock ticker symbol
-            
-        Returns:
-            InlineKeyboardMarkup: Keyboard with analysis options
-        """
-        keyboard = [
-            [
-                InlineKeyboardButton("🔄 Analyze Another", callback_data='analyze_another'),
-                InlineKeyboardButton("📊 View Details", callback_data=f'view_details:{symbol}'),
-            ],
-            [
-                InlineKeyboardButton("📁 Download Report", callback_data=f'download:{symbol}'),
-            ],
-            [
-                InlineKeyboardButton("💾 Save", callback_data=f'save:{symbol}'),
-                InlineKeyboardButton("🗑️ Delete", callback_data='delete'),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    
-    @staticmethod
-    def _create_help_keyboard() -> InlineKeyboardMarkup:
-        """Create inline keyboard for help message.
-        
-        Returns:
-            InlineKeyboardMarkup: Keyboard with help options
-        """
-        keyboard = [
-            [
-                InlineKeyboardButton("⚙️ Settings", callback_data='settings'),
-                InlineKeyboardButton("📈 Commands", callback_data='commands'),
-            ],
-            [
-                InlineKeyboardButton("📊 Quick Analyze", callback_data='analyze_quick'),
-            ],
-            [
-                InlineKeyboardButton("🔙 Back to Menu", callback_data='menu'),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    
     async def error_handler(
         self,
         update: Update,
@@ -595,9 +578,15 @@ END OF REPORT
         elif callback_data.startswith('download:'):
             symbol = callback_data.split(':')[1]
             await query.answer(f"📁 Report for {symbol} is attached to the message above")
+        elif callback_data.startswith('compare_agents:'):
+            symbol = callback_data.split(':')[1]
+            await self._show_agent_comparison(query, symbol, user_id)
         elif callback_data.startswith('save:'):
             symbol = callback_data.split(':')[1]
             await self._save_analysis(query, symbol, user_id)
+        elif callback_data.startswith('back_to_analysis:'):
+            symbol = callback_data.split(':')[1]
+            await self.handle_back_to_analysis(query, symbol, user_id)
         elif callback_data == 'delete':
             await self._delete_message(query)
         elif callback_data == 'menu':
@@ -734,6 +723,123 @@ END OF REPORT
         )
         keyboard = self._create_welcome_keyboard()
         await query.message.edit_text(commands_text, parse_mode='HTML', reply_markup=keyboard)
+    
+    async def _show_agent_comparison(self, query, symbol: str, user_id: int) -> None:
+        """Show detailed comparison of individual agent analyses.
+        
+        Args:
+            query: Callback query object
+            symbol: Stock ticker symbol
+            user_id: User's Telegram ID
+        """
+        # Get saved analysis
+        if user_id not in self.user_sessions or 'last_analysis' not in self.user_sessions[user_id]:
+            await query.answer("❌ No analysis found. Please run /analyze first.")
+            return
+        
+        analysis = self.user_sessions[user_id]['last_analysis']
+        agent_reports = analysis.get('agent_reports', {})
+        
+        if not agent_reports:
+            await query.answer("❌ No individual agent reports available.")
+            return
+        
+        # Format comparison with better separation
+        comparison_text = f"🔍 <b>Multi-Agent Comparison for {symbol}</b>\n\n"
+        comparison_text += "=" * 40 + "\n\n"
+        
+        for idx, (agent_name, report) in enumerate(agent_reports.items(), 1):
+            comparison_text += f"<b>Agent {idx}: {agent_name}</b>\n"
+            comparison_text += "-" * 40 + "\n"
+            comparison_text += f"{report}\n\n"
+            
+            # Add separator between agents (except last one)
+            if idx < len(agent_reports):
+                comparison_text += "=" * 40 + "\n\n"
+        
+        comparison_text += f"\n<i>Use 📁 Download Report for full details</i>"
+        
+        # Create keyboard
+        keyboard = [
+            [
+                InlineKeyboardButton("🔙 Back to Analysis", callback_data=f'back_to_analysis:{symbol}'),
+            ],
+        ]
+        
+        await query.message.edit_text(
+            comparison_text,
+            parse_mode='HTML',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        logger.info(f"User {user_id} viewed agent comparison for {symbol}")
+    
+    @staticmethod
+    def _create_welcome_keyboard():
+        """Create inline keyboard for welcome message."""
+        keyboard = [
+            [
+                InlineKeyboardButton("📊 Analyze Stock", callback_data='analyze_quick'),
+                InlineKeyboardButton("❓ Help", callback_data='help'),
+            ],
+            [
+                InlineKeyboardButton("ℹ️ About", callback_data='about'),
+                InlineKeyboardButton("⚙️ Settings", callback_data='settings'),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+    
+    @staticmethod
+    def _create_help_keyboard():
+        """Create inline keyboard for help message."""
+        keyboard = [
+            [
+                InlineKeyboardButton("📊 Analyze Stock", callback_data='analyze_quick'),
+            ],
+            [
+                InlineKeyboardButton("⬅️ Back to Menu", callback_data='menu'),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+    
+    @staticmethod
+    def _create_analysis_keyboard(symbol: str):
+        """Create inline keyboard for analysis results."""
+        keyboard = [
+            [
+                InlineKeyboardButton("🔍 Compare Agents", callback_data=f'compare_agents:{symbol}'),
+                InlineKeyboardButton("📁 Download Report", callback_data=f'download:{symbol}'),
+            ],
+            [
+                InlineKeyboardButton("💾 Save Analysis", callback_data=f'save:{symbol}'),
+                InlineKeyboardButton("🔄 Analyze Another", callback_data='analyze_another'),
+            ],
+            [
+                InlineKeyboardButton("❌ Close", callback_data='delete'),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+    
+    async def handle_back_to_analysis(self, query, symbol: str, user_id: int) -> None:
+        """Handle back to analysis button.
+        
+        Args:
+            query: Callback query object
+            symbol: Stock ticker symbol
+            user_id: User's Telegram ID
+        """
+        # Get saved analysis
+        if user_id not in self.user_sessions or 'last_analysis' not in self.user_sessions[user_id]:
+            await query.answer("❌ No analysis found.")
+            return
+        
+        analysis = self.user_sessions[user_id]['last_analysis']
+        
+        # Show analysis summary with keyboard
+        summary = self._format_analysis_summary(analysis)
+        keyboard = self._create_analysis_keyboard(symbol)
+        
+        await query.message.edit_text(summary, parse_mode='HTML', reply_markup=keyboard)
+
 
 
 def main() -> None:
