@@ -162,12 +162,15 @@ class TradingAgent:
         config["quick_think_llm"] = GLM_MODEL_VERSION
         config["max_debate_rounds"] = TRADINGAGENTS_MAX_DEBATE_ROUNDS
         
+        # Set recursion limit to prevent infinite loops
+        config["recursion_limit"] = 200  # Increased from default 100
+        
         # Configure data vendors
         # Use yfinance for stock data, Alpha Vantage for news
         config["data_vendors"] = {
             "core_stock_apis": TRADINGAGENTS_DATA_VENDOR,
             "technical_indicators": TRADINGAGENTS_DATA_VENDOR,
-            "fundamental_data": TRADINGAGENTS_DATA_VENDOR,
+            "fundamental_data": "alpha_vantage",
             "news_data": "alpha_vantage",  # Alpha Vantage for news data
         }
         
@@ -317,7 +320,8 @@ class TradingAgent:
                 "confidence": confidence,
                 "reasons": analysis_text or "Analysis completed successfully",
                 "price_target": price_target,
-                "risk_level": risk_level
+                "risk_level": risk_level,
+                "agent_reports": self._extract_individual_agent_reports(result)
             }
             
         except Exception as e:
@@ -504,5 +508,72 @@ class TradingAgent:
             return RISK_LEVEL_HIGH
         elif any(keyword in risk_lower for keyword in RISK_LOW_KEYWORDS):
             return RISK_LEVEL_LOW
-        
         return RISK_LEVEL_MEDIUM
+    
+    @staticmethod
+    def _extract_individual_agent_reports(result: Dict[str, Any]) -> Dict[str, str]:
+        """Extract individual agent reports for multi-agent analysis display.
+        
+        Args:
+            result: Raw result dictionary from TradingAgents
+            
+        Returns:
+            Dictionary with individual agent reports
+        """
+        if not isinstance(result, dict):
+            return {}
+        
+        agent_reports = {}
+        
+        # Extract specific agent reports
+        report_mappings = {
+            'market_report': '📊 Market Analyst',
+            'fundamentals_report': '💰 Fundamental Analyst',
+            'news_report': '📰 News Analyst',
+            'sentiment_report': '😊 Sentiment Analyst',
+            'risk_debate_state': '⚠️ Risk Analyst',
+            'investment_debate_state': '🎯 Investment Committee',
+            'trader_investment_plan': '📈 Trading Plan',
+        }
+        
+        # Error phrases to filter out
+        error_phrases = [
+            'i apologize for the confusion',
+            'future date',
+            'invalid inputs',
+            'let me know how you\'d like to proceed',
+            'cannot provide news for future',
+            'it seems there was an issue',
+            'apologize',
+            'error',
+            'unfortunately',
+        ]
+        
+        for result_key, agent_name in report_mappings.items():
+            report_data = result.get(result_key, '')
+            
+            # Handle different data types
+            if isinstance(report_data, dict):
+                # Extract judge_decision from debate states
+                if 'judge_decision' in report_data:
+                    report_data = report_data['judge_decision']
+                elif 'decision' in report_data:
+                    report_data = report_data['decision']
+                else:
+                    continue
+            
+            if not report_data or not isinstance(report_data, str):
+                continue
+            
+            # Filter out error messages
+            report_lower = report_data.lower()
+            is_error = any(phrase in report_lower for phrase in error_phrases)
+            
+            if not is_error and len(report_data.strip()) > 30:
+                # Truncate very long reports
+                if len(report_data) > 500:
+                    report_data = report_data[:500] + "..."
+                agent_reports[agent_name] = report_data
+        
+        return agent_reports
+

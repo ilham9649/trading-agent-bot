@@ -64,7 +64,7 @@ EMOJI_ROCKET: Final[str] = '\U0001F680'  # 🚀
 EMOJI_CHART_UP: Final[str] = '\U0001F4C8'  # 📈
 
 # File Settings
-ANALYSIS_FILE_EXTENSION: Final[str] = '.txt'
+ANALYSIS_FILE_EXTENSION: Final[str] = '.html'
 DEFAULT_FILE_ENCODING: Final[str] = 'utf-8'
 
 # Analysis Settings
@@ -77,11 +77,11 @@ REPORT_SEPARATOR: Final[str] = '=' * 80
 REPORT_HEADER_SEPARATOR: Final[str] = '-' * 80
 
 # TradingAgents Settings
-TRADINGAGENTS_MAX_DEBATE_ROUNDS: Final[int] = 1
+TRADINGAGENTS_MAX_DEBATE_ROUNDS: Final[int] = 10
 TRADINGAGENTS_DATA_VENDOR: Final[str] = 'yfinance'
 
 # GLM API Settings
-GLM_MODEL_VERSION: Final[str] = 'glm-4.6'
+GLM_MODEL_VERSION: Final[str] = 'glm-4-32b-0414-128k'
 GLM_API_BASE_URL: Final[str] = 'https://api.z.ai/api/coding/paas/v4'
 
 # OpenAI Settings
