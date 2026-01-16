@@ -15,12 +15,10 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import sys
-from pathlib import Path
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backtesting.engine import BacktestEngine, BacktestConfig, save_backtest_result
+from backtesting.core.engine import BacktestEngine, BacktestConfig, save_backtest_result
 from trading_agent import TradingAgent
 from config import Config, ConfigurationError
 
@@ -95,10 +93,10 @@ def parse_arguments():
     )
     
     parser.add_argument(
-    '--output-dir',
-    type=str,
-    default='./backtesting/results',
-    help='Directory to save backtest results'
+        '--output-dir',
+        type=str,
+        default='./backtesting/results',
+        help='Directory to save backtest results'
     )
     
     parser.add_argument(

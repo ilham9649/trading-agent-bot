@@ -81,8 +81,8 @@ TRADINGAGENTS_MAX_DEBATE_ROUNDS: Final[int] = 1
 TRADINGAGENTS_DATA_VENDOR: Final[str] = 'yfinance'
 
 # GLM API Settings
-GLM_MODEL_VERSION: Final[str] = 'glm-4-32b-0414-128k'
-GLM_API_BASE_URL: Final[str] = 'https://api.z.ai/api/paas/v4/'
+GLM_MODEL_VERSION: Final[str] = 'glm-4.6'
+GLM_API_BASE_URL: Final[str] = 'https://api.z.ai/api/coding/paas/v4'
 
 # OpenAI Settings
 OPENAI_EMBEDDING_MODEL: Final[str] = 'text-embedding-3-small'

@@ -50,6 +50,8 @@ if str(trading_agents_path) not in sys.path:
     sys.path.insert(0, str(trading_agents_path))
 
 # Import TradingAgents with error handling
+DEFAULT_CONFIG = {}
+TRADING_AGENTS_AVAILABLE = False
 try:
     from tradingagents.graph.trading_graph import TradingAgentsGraph
     from tradingagents.default_config import DEFAULT_CONFIG
@@ -151,7 +153,7 @@ class TradingAgent:
         Returns:
             Dictionary with TradingAgents configuration
         """
-        config = DEFAULT_CONFIG.copy()
+        config = DEFAULT_CONFIG.copy() if DEFAULT_CONFIG else {}
         
         # Configure LLM provider (GLM is OpenAI-compatible)
         config["llm_provider"] = "openai"
