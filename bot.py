@@ -459,19 +459,8 @@ Always conduct your own research before making investment decisions.
         def markdown_to_html(text: str) -> str:
             return markdown(text)
         
-        # Format agent reports section
+        # Remove Individual Agent Reports section (as requested)
         agent_section = ""
-        if agent_reports:
-            agent_section = "<div class='agent-reports'>\n"
-            agent_section += "<h2>Individual Agent Reports</h2>\n"
-            
-            for idx, (agent_name, report) in enumerate(agent_reports.items(), 1):
-                agent_section += "<div class='agent-report'>\n"
-                agent_section += f"<h3>Agent {idx}: {agent_name}</h3>\n"
-                agent_section += f"<div class='report-content'>{markdown_to_html(report)}</div>\n"
-                agent_section += "</div>\n\n"
-            
-            agent_section += "</div>\n\n"
         
         reasons_escaped = markdown_to_html(reasons)
         
@@ -532,16 +521,6 @@ Always conduct your own research before making investment decisions.
             font-weight: bold;
             color: #2E7D32;
         }}
-        .agent-reports {{
-            margin-top: 30px;
-        }}
-        .agent-report {{
-            background-color: #fff3e0;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border-left: 4px solid #FF9800;
-        }}
         .report-content {{
             color: #333;
             line-height: 1.8;
@@ -558,19 +537,57 @@ Always conduct your own research before making investment decisions.
             font-size: 12px;
             margin-bottom: 20px;
         }}
+        /* Main table styles */
         table {{
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
+            font-size: 14px;
         }}
         th, td {{
             padding: 12px;
             text-align: left;
-            border-bottom: 1px solid #ddd;
+            border: 1px solid #ddd;
+            vertical-align: top;
         }}
         th {{
             background-color: #4CAF50;
             color: white;
+            font-weight: bold;
+        }}
+        tr:nth-child(even) {{
+            background-color: #f9f9f9;
+        }}
+        tr:hover {{
+            background-color: #f0f0f0;
+        }}
+        /* Tables inside report-content (from markdown) */
+        .report-content table {{
+            margin: 15px 0;
+            font-size: 13px;
+        }}
+        .report-content th,
+        .report-content td {{
+            border: 1px solid #ccc;
+            padding: 8px 12px;
+        }}
+        .report-content th {{
+            background-color: #2196F3;
+            color: white;
+        }}
+        .report-content tr:nth-child(even) {{
+            background-color: #f5f5f5;
+        }}
+        .report-content ul {{
+            padding-left: 20px;
+            margin: 10px 0;
+        }}
+        .report-content ol {{
+            padding-left: 20px;
+            margin: 10px 0;
+        }}
+        .report-content li {{
+            margin: 5px 0;
         }}
     </style>
 </head>
