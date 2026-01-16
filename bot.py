@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Optional
 from pathlib import Path
-import mistune
+import markdown
 
 from telegram import Update
 from telegram.ext import (
@@ -454,10 +454,10 @@ Always conduct your own research before making investment decisions.
             RECOMMENDATION_EMOJIS[RECOMMENDATION_HOLD]
         )
         
-        # Convert markdown to HTML using mistune
-        markdown = mistune.create_markdown()
+        # Convert markdown to HTML using markdown library (has table support)
+        md = markdown.Markdown(extensions=['tables', 'fenced_code', 'nl2br'])
         def markdown_to_html(text: str) -> str:
-            return markdown(text)
+            return md.convert(text)
         
         # Remove Individual Agent Reports section (as requested)
         agent_section = ""
