@@ -15,7 +15,7 @@ import os
 from typing import Optional
 from pathlib import Path
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -219,11 +219,8 @@ class TradingBot:
                 encoding=DEFAULT_FILE_ENCODING
             )
             
-            # Create keyboard for analysis actions
-            keyboard = self._create_analysis_keyboard(symbol)
-            
-            # Send summary message with keyboard
-            await loading_msg.edit_text(summary, parse_mode='HTML', reply_markup=keyboard)
+            # Send summary message
+            await loading_msg.edit_text(summary, parse_mode='HTML')
             
             # Send full analysis as file
             with open(temp_file_path, 'rb') as f:
@@ -381,16 +378,16 @@ Always conduct your own research before making investment decisions.
         # Try to cut at sentence boundary
         truncated = text[:max_length]
         last_period = truncated.rfind('.')
-        last_newline = truncated.rfind('\\n')
+        last_newline = truncated.rfind('\n')
         
         cut_point = max(last_period, last_newline)
         
         # Only use cut point if it's reasonably close to the limit
         threshold = max_length - 500
         if cut_point > threshold:
-            return text[:cut_point + 1] + "\\n\\n[See full report in attached file...]"
+            return text[:cut_point + 1] + "\n\n[See full report in attached file...]"
         else:
-            return truncated + "...\\n\\n[See full report in attached file...]"
+            return truncated + "...\n\n[See full report in attached file...]"
     
     @staticmethod
     def _format_agent_breakdown(agent_reports: dict) -> str:
@@ -436,7 +433,7 @@ Always conduct your own research before making investment decisions.
             analysis: Analysis results dictionary
             
         Returns:
-            Formatted full analysis text
+            Formatted full analysis text in HTML format
         """
         # Extract data
         symbol = analysis.get('symbol', 'N/A')
@@ -450,71 +447,211 @@ Always conduct your own research before making investment decisions.
         reasons = analysis.get('reasons', 'No analysis available')
         agent_reports = analysis.get('agent_reports', {})
         
+        # Get emoji for recommendation
+        rec_emoji = RECOMMENDATION_EMOJIS.get(
+            str(recommendation).upper(),
+            RECOMMENDATION_EMOJIS[RECOMMENDATION_HOLD]
+        )
+        
         # Format agent reports section
         agent_section = ""
         if agent_reports:
-            agent_section = "\\n\\n" + REPORT_SEPARATOR + "\\n"
-            agent_section += "INDIVIDUAL AGENT REPORTS\\n"
-            agent_section += REPORT_SEPARATOR + "\\n\\n"
+            agent_section = "<div class='agent-reports'>\n"
+            agent_section += "<h2>Individual Agent Reports</h2>\n"
             
             for idx, (agent_name, report) in enumerate(agent_reports.items(), 1):
-                agent_section += f"[Agent {idx}] {agent_name}\\n"
-                agent_section += "-" * 80 + "\\n"
-                agent_section += f"{report}\\n\\n"
-                if idx < len(agent_reports):
-                    agent_section += REPORT_SEPARATOR + "\\n\\n"
+                agent_section += f"<div class='agent-report'>\n"
+                agent_section += f"<h3>Agent {idx}: {agent_name}</h3>\n"
+                agent_section += f"<div class='report-content'>{report}</div>\n"
+                agent_section += "</div>\n\n"
+            
+            agent_section += "</div>\n\n"
         
-        # Create comprehensive report
-        return f"""
-{REPORT_SEPARATOR}
-COMPREHENSIVE STOCK ANALYSIS REPORT
-{REPORT_SEPARATOR}
+        # Escape HTML special characters in report text
+        def escape_html(text: str) -> str:
+            return (str(text)
+                    .replace('&', '&amp;')
+                    .replace('<', '&lt;')
+                    .replace('>', '&gt;')
+                    .replace('"', '&quot;')
+                    .replace("'", '&#39;'))
+        
+        reasons_escaped = escape_html(reasons)
+        
+        # Create comprehensive HTML report
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analysis Report - {symbol}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }}
+        .container {{
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        h1 {{
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }}
+        h2 {{
+            color: #444;
+            border-left: 4px solid #2196F3;
+            padding-left: 15px;
+            margin-top: 30px;
+        }}
+        h3 {{
+            color: #555;
+            margin-top: 20px;
+        }}
+        .section {{
+            margin-bottom: 30px;
+        }}
+        .market-data {{
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }}
+        .recommendation {{
+            background-color: #e8f5e9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }}
+        .recommendation .action {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #2E7D32;
+        }}
+        .agent-reports {{
+            margin-top: 30px;
+        }}
+        .agent-report {{
+            background-color: #fff3e0;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #FF9800;
+        }}
+        .report-content {{
+            white-space: pre-wrap;
+            color: #333;
+        }}
+        .disclaimer {{
+            background-color: #ffebee;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #c62828;
+        }}
+        .meta {{
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }}
+        th, td {{
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }}
+        th {{
+            background-color: #4CAF50;
+            color: white;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Comprehensive Stock Analysis Report</h1>
+        
+        <div class="meta">
+            <p><strong>Symbol:</strong> {symbol}</p>
+            <p><strong>Generated:</strong> {timestamp}</p>
+            <p><strong>Analysis Type:</strong> {analysis.get('analysis_type', 'TRADING_AGENTS')}</p>
+            <p><strong>Powered by:</strong> TradingAgents Multi-Agent Framework + GLM-4-32b-0414-128k (Z.AI)</p>
+        </div>
 
-Symbol: {symbol}
-Generated: {timestamp}
-Analysis Type: {analysis.get('analysis_type', 'TRADING_AGENTS')}
-Powered by: TradingAgents Multi-Agent Framework + GLM-4-32b-0414-128k (Z.AI)
+        <div class="section">
+            <h2>Market Data</h2>
+            <div class="market-data">
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Current Price</td>
+                        <td>${current_price:.2f}</td>
+                    </tr>
+                    <tr>
+                        <td>Price Change</td>
+                        <td>{price_change:+.2f}%</td>
+                    </tr>
+                    <tr>
+                        <td>Price Target</td>
+                        <td>${price_target:.2f}</td>
+                    </tr>
+                    <tr>
+                        <td>Target Change</td>
+                        <td>{((price_target / current_price - 1) * 100):+.2f}%</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
 
-{REPORT_SEPARATOR}
-MARKET DATA
-{REPORT_SEPARATOR}
+        <div class="section">
+            <h2>Recommendation</h2>
+            <div class="recommendation">
+                <p class="action">{rec_emoji} {recommendation}</p>
+                <p><strong>Confidence:</strong> {confidence}/10</p>
+                <p><strong>Risk Level:</strong> {risk_level}</p>
+            </div>
+        </div>
 
-Current Price: ${current_price:.2f}
-Price Change: {price_change:+.2f}%
-Price Target: ${price_target:.2f}
-Target Change: {((price_target / current_price - 1) * 100):+.2f}%
+        <div class="section">
+            <h2>Detailed Analysis</h2>
+            <div class="report-content">
+                {reasons_escaped}
+            </div>
+        </div>
 
-{REPORT_SEPARATOR}
-RECOMMENDATION
-{REPORT_SEPARATOR}
+        {agent_section}
 
-Action: {recommendation}
-Confidence: {confidence}/10
-Risk Level: {risk_level}
-
-{REPORT_SEPARATOR}
-DETAILED ANALYSIS
-{REPORT_SEPARATOR}
-
-{reasons}{agent_section}
-
-{REPORT_SEPARATOR}
-DISCLAIMER
-{REPORT_SEPARATOR}
-
-This analysis is generated by AI and should not be considered as financial advice.
-Always do your own research and consult with a qualified financial advisor before
-making investment decisions. Past performance does not guarantee future results.
-
-Generated by Trading Agent Bot using:
-- GLM-4-32b-0414-128k (Z.AI) for analysis
-- TradingAgents multi-agent framework
-- yfinance for market data
-
-{REPORT_SEPARATOR}
-END OF REPORT
-{REPORT_SEPARATOR}
-"""
+        <div class="section">
+            <h2>Disclaimer</h2>
+            <div class="disclaimer">
+                <p>This analysis is generated by AI and should not be considered as financial advice.
+                Always do your own research and consult with a qualified financial advisor before
+                making investment decisions. Past performance does not guarantee future results.</p>
+                
+                <p><strong>Generated by Trading Agent Bot using:</strong></p>
+                <ul>
+                    <li>GLM-4-32b-0414-128k (Z.AI) for analysis</li>
+                    <li>TradingAgents multi-agent framework</li>
+                    <li>yfinance for market data</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>"""
     
     @staticmethod
     def _generate_filename(symbol: str, timestamp: str) -> str:
@@ -575,8 +712,7 @@ END OF REPORT
             await self._prompt_symbol(query)
         elif callback_data == 'help':
             help_text = self._get_help_text()
-            keyboard = self._create_help_keyboard()
-            await query.message.edit_text(help_text, parse_mode='HTML', reply_markup=keyboard)
+            await query.message.edit_text(help_text, parse_mode='HTML')
         elif callback_data == 'about':
             await self._show_about(query)
         elif callback_data == 'analyze_another':
@@ -635,8 +771,7 @@ END OF REPORT
             f"• Comprehensive reports\n\n"
             f"<i>Built with ❤️ for traders</i>"
         )
-        keyboard = self._create_welcome_keyboard()
-        await query.message.edit_text(about_text, parse_mode='HTML', reply_markup=keyboard)
+        await query.message.edit_text(about_text, parse_mode='HTML')
     
     async def _show_detailed_info(self, query, symbol: str) -> None:
         """Show detailed information about a symbol.
@@ -656,8 +791,7 @@ END OF REPORT
             f"• Price targets\n"
             f"• Comprehensive AI analysis from multiple agents"
         )
-        keyboard = self._create_welcome_keyboard()
-        await query.message.edit_text(info_text, parse_mode='HTML', reply_markup=keyboard)
+        await query.message.edit_text(info_text, parse_mode='HTML')
     
     async def _save_analysis(self, query, symbol: str, user_id: int) -> None:
         """Save analysis to user history.
@@ -694,8 +828,7 @@ END OF REPORT
             query: Callback query object
         """
         welcome_msg = self._get_welcome_message()
-        keyboard = self._create_welcome_keyboard()
-        await query.message.edit_text(welcome_msg, parse_mode='HTML', reply_markup=keyboard)
+        await query.message.edit_text(welcome_msg, parse_mode='HTML')
     
     async def _show_settings(self, query) -> None:
         """Show settings information.
@@ -711,8 +844,7 @@ END OF REPORT
             f"• Max Recommendations: <code>{Config.MAX_RECOMMENDATIONS}</code>\n\n"
             f"<i>Advanced settings can be configured in .env file</i>"
         )
-        keyboard = self._create_welcome_keyboard()
-        await query.message.edit_text(settings_text, parse_mode='HTML', reply_markup=keyboard)
+        await query.message.edit_text(settings_text, parse_mode='HTML')
     
     async def _show_commands(self, query) -> None:
         """Show available commands.
@@ -730,8 +862,7 @@ END OF REPORT
             f"<code>/analyze TSLA</code>\n"
             f"<code>/analyze MSFT</code>"
         )
-        keyboard = self._create_welcome_keyboard()
-        await query.message.edit_text(commands_text, parse_mode='HTML', reply_markup=keyboard)
+        await query.message.edit_text(commands_text, parse_mode='HTML')
     
     async def _show_agent_comparison(self, query, symbol: str, user_id: int) -> None:
         """Show detailed comparison of individual agent analyses.
@@ -768,65 +899,11 @@ END OF REPORT
         
         comparison_text += f"\n<i>Use 📁 Download Report for full details</i>"
         
-        # Create keyboard
-        keyboard = [
-            [
-                InlineKeyboardButton("🔙 Back to Analysis", callback_data=f'back_to_analysis:{symbol}'),
-            ],
-        ]
-        
         await query.message.edit_text(
             comparison_text,
-            parse_mode='HTML',
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            parse_mode='HTML'
         )
         logger.info(f"User {user_id} viewed agent comparison for {symbol}")
-    
-    @staticmethod
-    def _create_welcome_keyboard():
-        """Create inline keyboard for welcome message."""
-        keyboard = [
-            [
-                InlineKeyboardButton("📊 Analyze Stock", callback_data='analyze_quick'),
-                InlineKeyboardButton("❓ Help", callback_data='help'),
-            ],
-            [
-                InlineKeyboardButton("ℹ️ About", callback_data='about'),
-                InlineKeyboardButton("⚙️ Settings", callback_data='settings'),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    
-    @staticmethod
-    def _create_help_keyboard():
-        """Create inline keyboard for help message."""
-        keyboard = [
-            [
-                InlineKeyboardButton("📊 Analyze Stock", callback_data='analyze_quick'),
-            ],
-            [
-                InlineKeyboardButton("⬅️ Back to Menu", callback_data='menu'),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    
-    @staticmethod
-    def _create_analysis_keyboard(symbol: str):
-        """Create inline keyboard for analysis results."""
-        keyboard = [
-            [
-                InlineKeyboardButton("🔍 Compare Agents", callback_data=f'compare_agents:{symbol}'),
-                InlineKeyboardButton("📁 Download Report", callback_data=f'download:{symbol}'),
-            ],
-            [
-                InlineKeyboardButton("💾 Save Analysis", callback_data=f'save:{symbol}'),
-                InlineKeyboardButton("🔄 Analyze Another", callback_data='analyze_another'),
-            ],
-            [
-                InlineKeyboardButton("❌ Close", callback_data='delete'),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
     
     async def handle_back_to_analysis(self, query, symbol: str, user_id: int) -> None:
         """Handle back to analysis button.
@@ -843,11 +920,10 @@ END OF REPORT
         
         analysis = self.user_sessions[user_id]['last_analysis']
         
-        # Show analysis summary with keyboard
+        # Show analysis summary
         summary = self._format_analysis_summary(analysis)
-        keyboard = self._create_analysis_keyboard(symbol)
         
-        await query.message.edit_text(summary, parse_mode='HTML', reply_markup=keyboard)
+        await query.message.edit_text(summary, parse_mode='HTML')
 
 
 

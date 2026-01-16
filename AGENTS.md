@@ -165,12 +165,11 @@ backtesting/          # Backtesting module
   - Recommendation (Action, Confidence, Risk Level, Price Target)
   - Brief summary (max 500 chars)
   - Note to see full report in attachment
-  - Interactive keyboard buttons
   
-- **Full Report Attachment**: Downloadable `.txt` file contains:
+- **Full Report Attachment**: Downloadable `.html` file contains:
   - All market data and recommendation details
-  - Complete detailed analysis
-  - **Individual Agent Reports** with clear separators:
+  - Complete detailed analysis in formatted HTML with CSS styling
+  - **Individual Agent Reports** (with clear separators):
     - Market Analyst
     - Fundamental Analyst
     - News Analyst
@@ -179,13 +178,7 @@ backtesting/          # Backtesting module
     - Investment Committee
     - Trading Plan
   - Disclaimer
-
-#### Interactive Keyboards
-- **Welcome Keyboard**: Analyze Stock, Help, About, Settings
-- **Help Keyboard**: Analyze Stock, Back to Menu
-- **Analysis Keyboard**: Compare Agents, Download Report, Save Analysis, Analyze Another, Close
-- Create keyboards using `InlineKeyboardButton` and `InlineKeyboardMarkup` from `telegram` library
-- Button callback data format: `action:param` (e.g., `compare_agents:AAPL`)
+  - Professional formatting with tables, sections, and colored boxes
 
 #### Truncation
 - Use `_truncate_analysis_text(text, max_length)` to limit text length

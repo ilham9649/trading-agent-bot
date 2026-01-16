@@ -64,7 +64,7 @@ EMOJI_ROCKET: Final[str] = '\U0001F680'  # 🚀
 EMOJI_CHART_UP: Final[str] = '\U0001F4C8'  # 📈
 
 # File Settings
-ANALYSIS_FILE_EXTENSION: Final[str] = '.txt'
+ANALYSIS_FILE_EXTENSION: Final[str] = '.html'
 DEFAULT_FILE_ENCODING: Final[str] = 'utf-8'
 
 # Analysis Settings
