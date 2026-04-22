@@ -159,3 +159,4 @@ TradingAgents/
 eval_results/
 .bot.pid
 *_analysis_*.txt
+backtesting/results/
